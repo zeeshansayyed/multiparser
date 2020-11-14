@@ -46,6 +46,7 @@ class LSTM(nn.Module):
         self.num_layers = num_layers
         self.bidirectional = bidirectional
         self.dropout = dropout
+        self.num_directions = 1 + self.bidirectional
 
         self.f_cells = nn.ModuleList()
         if bidirectional:
@@ -54,7 +55,7 @@ class LSTM(nn.Module):
             self.f_cells.append(nn.LSTMCell(input_size=input_size, hidden_size=hidden_size))
             if bidirectional:
                 self.b_cells.append(nn.LSTMCell(input_size=input_size, hidden_size=hidden_size))
-            input_size = hidden_size * (1 + self.bidirectional)
+            input_size = hidden_size * self.num_directions
 
         self.reset_parameters()
 
@@ -133,7 +134,7 @@ class LSTM(nn.Module):
                 The first is a packed variable length sequence.
                 The second is a tuple of tensors `h` and `c`.
                 `h` of shape ``[num_layers*num_directions, batch_size, hidden_size]`` holds the hidden state for `t=seq_len`.
-                Like output, the layers can be separated using ``h.view(num_layers, 2, batch_size, hidden_size)``
+                Like output, the layers can be separated using ``h.view(num_layers, num_directions, batch_size, hidden_size)``
                 and similarly for c.
                 `c` of shape ``[num_layers*num_directions, batch_size, hidden_size]`` holds the cell state for `t=seq_len`.
         """
@@ -142,12 +143,12 @@ class LSTM(nn.Module):
         h_n, c_n = [], []
 
         if hx is None:
-            ih = x.new_zeros(self.num_layers * 2, batch_size, self.hidden_size)
+            ih = x.new_zeros(self.num_layers * self.num_directions, batch_size, self.hidden_size)
             h, c = ih, ih
         else:
             h, c = self.permute_hidden(hx, sequence.sorted_indices)
-        h = h.view(self.num_layers, 2, batch_size, self.hidden_size)
-        c = c.view(self.num_layers, 2, batch_size, self.hidden_size)
+        h = h.view(self.num_layers, self.num_directions, batch_size, self.hidden_size)
+        c = c.view(self.num_layers, self.num_directions, batch_size, self.hidden_size)
 
         for i in range(self.num_layers):
             x = torch.split(x, batch_sizes)
