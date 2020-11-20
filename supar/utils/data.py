@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from collections import namedtuple
+import random
 
 import torch
 import torch.distributed as dist
@@ -110,6 +111,41 @@ class DataLoader(torch.utils.data.DataLoader):
     def __iter__(self):
         for batch in super().__iter__():
             yield namedtuple('Batch', [f.name for f in batch.keys()])(*[f.compose(d) for f, d in batch.items()])
+            
+
+class MultitaskDataLoader():
+    """A class which combines multiple dataloaders into one for multitask learning
+    """ 
+    def __init__(self, task_names, datasets, **kwargs):
+
+        self.task_names = task_names
+        self.lengths = [len(data.loader) for data in datasets]
+        self.iterators = [iter(data.loader) for data in datasets]
+        indices = [[i] * v for i, v in enumerate(self.lengths)]
+        self.task_indices = sum(indices, [])
+
+    def _reset(self):
+        random.shuffle(self.task_indices)
+        self.current_index = 0
+
+
+    def __iter__(self):
+        self._reset()
+        return self
+
+    def __len__(self):
+        return len(self.task_indices)
+
+    def __next__(self):
+        if self.current_index < len(self.task_indices):
+            task_index = self.task_indices[self.current_index]
+            task_name = self.task_names[task_index]
+            batch = next(self.iterators[task_index])
+            new_batch = (*batch, task_name)
+            self.current_index += 1
+            return new_batch
+        else:
+            raise StopIteration
 
 
 class Sampler(torch.utils.data.Sampler):
