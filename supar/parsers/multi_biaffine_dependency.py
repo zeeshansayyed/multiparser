@@ -133,9 +133,8 @@ class MultiBiaffineDependencyParser(Parser):
             # logger.info(f"{'test:':6} - loss: {loss:.4f} - {test_metric}")
 
             
-            logger.info(f"Best Epochs: {best_e} - Best Metrics: {list(best_metric.items())}")
             for task_name in args.task_names:
-                logger.info(f"{task_name:6} - epoch {best_e[task_name]} - {best_metric[task_name]}")
+                logger.info(f"{task_name:4} - Best epoch {best_e[task_name]} - {best_metric[task_name]}")
             
             t = datetime.now() - start
             logger.info(f"{t}s elapsed\n")
@@ -149,6 +148,7 @@ class MultiBiaffineDependencyParser(Parser):
             args.path = f"{args.path}_{task_name}"
             loss, metric = self.load(**args)._evaluate(test_data.loader, task_name)
             args.path = original_path
+
             logger.info(f"Epoch {best_e[task_name]} saved")
             logger.info(f"{'dev:':6} - {best_metric[task_name]}")
             logger.info(f"{'test:':6} - {metric}")
