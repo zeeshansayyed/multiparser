@@ -10,7 +10,7 @@ from supar.utils import Config, Dataset, Embedding
 from supar.utils.common import bos, eos, pad, unk
 from supar.utils.field import ChartField, Field, RawField, SubwordField
 from supar.utils.logging import get_logger, progress_bar
-from supar.utils.metric import BracketMetric
+from supar.utils.metric import SpanMetric
 from supar.utils.transform import Tree
 
 logger = get_logger(__name__)
@@ -133,7 +133,7 @@ class CRFConstituencyParser(Parser):
 
         bar = progress_bar(loader)
 
-        for words, feats, trees, (spans, labels) in bar:
+        for words, feats, trees, charts in bar:
             self.optimizer.zero_grad()
 
             batch_size, seq_len = words.shape
@@ -141,7 +141,7 @@ class CRFConstituencyParser(Parser):
             mask = lens.new_tensor(range(seq_len - 1)) < lens.view(-1, 1, 1)
             mask = mask & mask.new_ones(seq_len-1, seq_len-1).triu_(1)
             s_span, s_label = self.model(words, feats)
-            loss, _ = self.model.loss(s_span, s_label, spans, labels, mask, self.args.mbr)
+            loss, _ = self.model.loss(s_span, s_label, charts, mask, self.args.mbr)
             loss.backward()
             nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)
             self.optimizer.step()
@@ -153,15 +153,15 @@ class CRFConstituencyParser(Parser):
     def _evaluate(self, loader):
         self.model.eval()
 
-        total_loss, metric = 0, BracketMetric()
+        total_loss, metric = 0, SpanMetric()
 
-        for words, feats, trees, (spans, labels) in loader:
+        for words, feats, trees, charts in loader:
             batch_size, seq_len = words.shape
             lens = words.ne(self.args.pad_index).sum(1) - 1
             mask = lens.new_tensor(range(seq_len - 1)) < lens.view(-1, 1, 1)
             mask = mask & mask.new_ones(seq_len-1, seq_len-1).triu_(1)
             s_span, s_label = self.model(words, feats)
-            loss, s_span = self.model.loss(s_span, s_label, spans, labels, mask, self.args.mbr)
+            loss, s_span = self.model.loss(s_span, s_label, charts, mask, self.args.mbr)
             chart_preds = self.model.decode(s_span, s_label, mask)
             # since the evaluation relies on terminals,
             # the tree should be first built and then factorized

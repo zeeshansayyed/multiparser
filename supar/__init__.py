@@ -5,13 +5,13 @@ from .parsers import (BiaffineDependencyParser, MultiBiaffineDependencyParser,
                       CRFConstituencyParser, CRFDependencyParser,
                       CRFNPDependencyParser, Parser)
 
-__all__ = ['Parser',
-           'BiaffineDependencyParser',
-           'MultiBiaffineDependencyParser',
+__all__ = ['BiaffineDependencyParser',
            'CRFNPDependencyParser',
            'CRFDependencyParser',
            'CRF2oDependencyParser',
-           'CRFConstituencyParser']
+           'CRFConstituencyParser',
+           'MultiBiaffineDependencyParser',
+           'Parser']
 __version__ = '1.0.0'
 
 PARSER = {parser.NAME: parser for parser in [BiaffineDependencyParser,
