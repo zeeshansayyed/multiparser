@@ -100,6 +100,108 @@ class Dataset(torch.utils.data.Dataset):
                                  collate_fn=self.collate_fn)
 
 
+
+class JointDataset(torch.utils.data.Dataset):
+    """Joint dataset that is used for joint multitask learning
+
+    Args:
+        Dataset ([type]): [description]
+
+    Raises:
+        StopIteration: [description]
+
+    Returns:
+        [type]: [description]
+
+    Yields:
+        [type]: [description]
+    """
+    def __init__(self, datasets, task_names) -> None:
+        super(JointDataset, self).__init__()
+        self.task_names = task_names
+        self.num_sentences = len(datasets[0].sentences)
+        assert all(len(d.sentences) == self.num_sentences for d in datasets)
+        self.sentences, self.fields = {}, {}
+        for name, dataset in zip(task_names, datasets):
+            self.sentences[name] = dataset.sentences
+            self.fields[name] = dataset.fields
+        self.buckets = datasets[0].buckets
+
+        # self.sentences = {
+        #     name: dataset.sentences
+        #     for name, dataset in zip(task_names, datasets)
+        # }
+        # self.fields = {
+        #     name: dataset.fields
+        #     for name, dataset in zip(task_names, datasets)
+        # }
+
+    def __repr__(self):
+        s = f"{self.__class__.__name__}(\n"
+        for name, sentences in self.sentences.items():
+            s += f"\t{name}={len(sentences)} sentences\n"
+        if hasattr(self, 'loader'):
+            s += f"\tn_batches={len(self.loader)}"
+        if hasattr(self, 'buckets'):
+            s += f"\tn_buckets={len(self.buckets)}"
+        s += ")"
+
+        return s
+
+    def __len__(self):
+        return self.num_sentences
+
+    def __getitem__(self, index):
+        if not hasattr(self, 'fields'):
+            raise RuntimeError(
+                "The fields are not numericalized. Please build the dataset first."
+            )
+        # Every sample is a dictionary containing two more dictionaries namely,
+        # inputs and outputs. Inputs contain `words`, `chars` and other 'features.
+        # Output contains 'rels' and 'arcs' for each task name
+        sample = {'inputs': {}, 'targets': {tn: {} for tn in self.task_names}}
+        first_task = self.task_names[0]
+        for f, d in self.fields[first_task].items():
+            if f.name not in ('rels', 'arcs'):
+                sample['inputs'][f] = d[index]
+
+        for task_name, fields in self.fields.items():
+            for f, d in fields.items():
+                if f.name in ('rels', 'arcs'):
+                    sample['targets'][task_name][f] = d[index]
+
+        return sample
+
+    @staticmethod
+    def _collate(collated_batch, batch):
+        """This is a helper function which fills `collated_batch` in place
+
+        Args:
+            collated_batch (dict): reference to empty dict
+            batch (List[Sample]): List of sample that should be collated
+        """
+        sample = batch[0]
+        for k, v in sample.items():
+            if isinstance(v, dict):
+                collated_batch[k] = {}
+                JointDataset._collate(collated_batch[k], [b[k] for b in batch])
+            else:
+                collated_batch[k] = tuple(b[k] for b in batch)
+
+    def collate_fn(self, batch):
+        collated_batch = {}
+        JointDataset._collate(collated_batch, batch)
+        return collated_batch
+
+    def build(self, batch_size, n_buckets=1, shuffle=False, distributed=False):
+
+        self.loader = JointDataLoader(
+            dataset=self,
+            batch_sampler=Sampler(buckets=self.buckets, batch_size=batch_size,
+                                  shuffle=shuffle, distributed=distributed),
+            collate_fn=self.collate_fn)
+
+
 class DataLoader(torch.utils.data.DataLoader):
     r"""
     DataLoader, matching with :class:`Dataset`.
@@ -111,11 +213,33 @@ class DataLoader(torch.utils.data.DataLoader):
     def __iter__(self):
         for batch in super().__iter__():
             yield namedtuple('Batch', [f.name for f in batch.keys()])(*[f.compose(d) for f, d in batch.items()])
-            
 
+
+class JointDataLoader(torch.utils.data.DataLoader):
+    """ Data loader for joint dataset"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def _compose(composed_batch, batch):
+        for k, v in batch.items():
+            if isinstance(v, dict):
+                composed_batch[k] = {}
+                JointDataLoader._compose(composed_batch[k], batch[k])
+            else:
+                composed_batch[k.name] = k.compose(v)
+
+    def __iter__(self):
+        for batch in super().__iter__():
+            composed_batch = {}
+            JointDataLoader._compose(composed_batch, batch)
+            yield namedtuple('Batch', list(composed_batch.keys()))(*composed_batch.values())
+
+    
 class MultitaskDataLoader():
     """A class which combines multiple dataloaders into one for multitask learning
-    """ 
+    """
     def __init__(self, task_names, datasets, **kwargs):
 
         self.task_names = task_names
@@ -127,7 +251,6 @@ class MultitaskDataLoader():
     def _reset(self):
         random.shuffle(self.task_indices)
         self.current_index = 0
-
 
     def __iter__(self):
         self._reset()
