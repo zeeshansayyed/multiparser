@@ -13,66 +13,9 @@ import pudb
 
 class MultiBiaffineDependencyModel(nn.Module):
     r"""
-    The implementation of Biaffine Dependency Parser.
+    The implementation of MultiTask and Joint dependency parsing model which uses 
+    Biaffine Dependency Parser as its core parser.
 
-    References:
-        - Timothy Dozat and Christopher D. Manning. 2017.
-          `Deep Biaffine Attention for Neural Dependency Parsing`_.
-
-    Args:
-        n_words (int):
-            The size of the word vocabulary.
-        n_feats (int):
-            The size of the feat vocabulary.
-        n_rels (int):
-            The number of labels in the treebank.
-        feat (str):
-            Specifies which type of additional feature to use: ``'char'`` | ``'bert'`` | ``'tag'``.
-            ``'char'``: Character-level representations extracted by CharLSTM.
-            ``'bert'``: BERT representations, other pretrained langugae models like XLNet are also feasible.
-            ``'tag'``: POS tag embeddings.
-            Default: ``'char'``.
-        n_embed (int):
-            The size of word embeddings. Default: 100.
-        n_feat_embed (int):
-            The size of feature representations. Default: 100.
-        n_char_embed (int):
-            The size of character embeddings serving as inputs of CharLSTM, required if ``feat='char'``. Default: 50.
-        bert (str):
-            Specifies which kind of language model to use, e.g., ``'bert-base-cased'`` and ``'xlnet-base-cased'``.
-            This is required if ``feat='bert'``. The full list can be found in `transformers`_.
-            Default: ``None``.
-        n_bert_layers (int):
-            Specifies how many last layers to use. Required if ``feat='bert'``.
-            The final outputs would be the weight sum of the hidden states of these layers.
-            Default: 4.
-        mix_dropout (float):
-            The dropout ratio of BERT layers. Required if ``feat='bert'``. Default: .0.
-        embed_dropout (float):
-            The dropout ratio of input embeddings. Default: .33.
-        n_lstm_hidden (int):
-            The size of LSTM hidden states. Default: 400.
-        n_lstm_layers (int):
-            The number of LSTM layers. Default: 3.
-        lstm_dropout (float):
-            The dropout ratio of LSTM. Default: .33.
-        n_mlp_arc (int):
-            Arc MLP size. Default: 500.
-        n_mlp_rel  (int):
-            Label MLP size. Default: 100.
-        mlp_dropout (float):
-            The dropout ratio of MLP layers. Default: .33.
-        feat_pad_index (int):
-            The index of the padding token in the feat vocabulary. Default: 0.
-        pad_index (int):
-            The index of the padding token in the word vocabulary. Default: 0.
-        unk_index (int):
-            The index of the unknown token in the word vocabulary. Default: 1.
-
-    .. _Deep Biaffine Attention for Neural Dependency Parsing:
-        https://openreview.net/forum?id=Hk95PK9le
-    .. _transformers:
-        https://github.com/huggingface/transformers
     """
 
     def __init__(self,
@@ -132,7 +75,7 @@ class MultiBiaffineDependencyModel(nn.Module):
         self.lstm_dropout = SharedDropout(p=lstm_dropout)
 
         # the MLP layers
-        if self.args.share_mlp:
+        if not self.args.share_mlp:
             mlp_arc_d = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
             mlp_arc_h = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
             mlp_rel_d = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_rel, dropout=mlp_dropout)
@@ -141,7 +84,6 @@ class MultiBiaffineDependencyModel(nn.Module):
             self.mlp_arc_h = nn.ModuleDict({task: mlp_arc_h for task in task_names})
             self.mlp_rel_d = nn.ModuleDict({task: mlp_rel_d for task in task_names})
             self.mlp_rel_h = nn.ModuleDict({task: mlp_rel_h for task in task_names})
-
         else:
             self.mlp_arc_d = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
             self.mlp_arc_h = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
@@ -166,23 +108,7 @@ class MultiBiaffineDependencyModel(nn.Module):
             nn.init.zeros_(self.word_embed.weight)
         return self
 
-    def forward(self, words, feats, task_name):
-        r"""
-        Args:
-            words (~torch.LongTensor): ``[batch_size, seq_len]``.
-                Word indices.
-            feats (~torch.LongTensor):
-                Feat indices.
-                If feat is ``'char'`` or ``'bert'``, the size of feats should be ``[batch_size, seq_len, fix_len]``.
-                if ``'tag'``, the size is ``[batch_size, seq_len]``.
-
-        Returns:
-            ~torch.Tensor, ~torch.Tensor:
-                The first tensor of shape ``[batch_size, seq_len, seq_len]`` holds scores of all possible arcs.
-                The second of shape ``[batch_size, seq_len, seq_len, n_labels]`` holds
-                scores of all possible labels on each arc.
-        """
-
+    def shared_forward(self, words, feats):
         batch_size, seq_len = words.shape
         # get the mask and lengths of given batch
         mask = words.ne(self.pad_index)
@@ -205,18 +131,24 @@ class MultiBiaffineDependencyModel(nn.Module):
         x, _ = self.lstm(x)
         x, _ = pad_packed_sequence(x, True, total_length=seq_len)
         x = self.lstm_dropout(x)
-
-        # apply MLPs to the BiLSTM output states
         if self.args.share_mlp:
+            arc_d = self.mlp_arc_d(x)
+            arc_h = self.mlp_arc_h(x)
+            rel_d = self.mlp_rel_d(x)
+            rel_h = self.mlp_rel_h(x)
+            return (arc_d, arc_h, rel_d, rel_h), mask
+        else:
+            return x, mask
+
+    def unshared_forward(self, shared_out, task_name):
+        x, mask = shared_out
+        if not self.args.share_mlp:
             arc_d = self.mlp_arc_d[task_name](x)
             arc_h = self.mlp_arc_h[task_name](x)
             rel_d = self.mlp_rel_d[task_name](x)
             rel_h = self.mlp_rel_h[task_name](x)
         else:
-            arc_d = self.mlp_arc_d(x)
-            arc_h = self.mlp_arc_h(x)
-            rel_d = self.mlp_rel_d(x)
-            rel_h = self.mlp_rel_h(x)
+            arc_d, arc_h, rel_d, rel_h = x
 
         # [batch_size, seq_len, seq_len]
         s_arc = self.arc_attn[task_name](arc_d, arc_h)
@@ -224,6 +156,28 @@ class MultiBiaffineDependencyModel(nn.Module):
         s_rel = self.rel_attn[task_name](rel_d, rel_h).permute(0, 2, 3, 1)
         # set the scores that exceed the length of each sentence to -inf
         s_arc.masked_fill_(~mask.unsqueeze(1), float('-inf'))
+
+        return s_arc, s_rel
+
+
+    def forward(self, words, feats, task_name):
+        r"""
+        Args:
+            words (~torch.LongTensor): ``[batch_size, seq_len]``.
+                Word indices.
+            feats (~torch.LongTensor):
+                Feat indices.
+                If feat is ``'char'`` or ``'bert'``, the size of feats should be ``[batch_size, seq_len, fix_len]``.
+                if ``'tag'``, the size is ``[batch_size, seq_len]``.
+
+        Returns:
+            ~torch.Tensor, ~torch.Tensor:
+                The first tensor of shape ``[batch_size, seq_len, seq_len]`` holds scores of all possible arcs.
+                The second of shape ``[batch_size, seq_len, seq_len, n_labels]`` holds
+                scores of all possible labels on each arc.
+        """
+        shared_out = self.shared_forward(words, feats)
+        s_arc, s_rel = self.unshared_forward(shared_out, task_name)
 
         return s_arc, s_rel
 
