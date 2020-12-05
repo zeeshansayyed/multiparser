@@ -18,11 +18,12 @@ from supar.utils.transform import CoNLL
 
 from torch.utils.data import ConcatDataset
 from torch.optim import Adam
-from supar.utils.data import MultitaskDataLoader
+from supar.utils.data import JointDataset, MultitaskDataLoader
 from supar.utils.parallel import DistributedDataParallel as DDP
 from supar.utils.parallel import is_master
 from supar.utils.metric import Metric
 from datetime import datetime, timedelta
+from pathlib import Path
 import pudb
 
 logger = get_logger(__name__)
@@ -51,9 +52,7 @@ class MultiBiaffineDependencyParser(Parser):
         else:
             self.WORD, self.FEAT = self.transform.FORM, self.transform.CPOS
         self.ARC, self.REL = self.transform.HEAD, self.transform.DEPREL
-        self.puncts = torch.tensor([
-            i for s, i in self.WORD.vocab.stoi.items() if ispunct(s)
-        ]).to(self.args.device)
+        self.puncts = torch.tensor([i for s, i in self.WORD.vocab.stoi.items() if ispunct(s)]).to(self.args.device)
 
     def train(self, train, dev, test, buckets=32, batch_size=5000, punct=False,
               tree=False, proj=False, partial=False, verbose=True, epochs=5000,
@@ -86,7 +85,9 @@ class MultiBiaffineDependencyParser(Parser):
         if dist.is_initialized():
             args.batch_size = args.batch_size // dist.get_world_size()
         logger.info("Loading the data")
-        train = [Dataset(self.transform, train_f, **args) for train_f in args.train]
+        train = [
+            Dataset(self.transform, train_f, **args) for train_f in args.train
+        ]
         dev = [Dataset(self.transform, dev_f, **args) for dev_f in args.dev]
         test = [Dataset(self.transform, test_f, **args) for test_f in args.test]
         for i in range(len(train)):
@@ -98,63 +99,70 @@ class MultiBiaffineDependencyParser(Parser):
             logger.info(
                 f"\n{'train:':6} {train[i]}\n{'dev:':6} {dev[i]}\n{'test:':6} {test[i]}\n"
             )
-        train_loader = MultitaskDataLoader(args.task_names, train)
-        
+
+        if args.joint_loss:
+            joint_train = JointDataset(train, args.task_names)
+            joint_train.build(args.batch_size)
+            train_loader = joint_train.loader
+        else:
+            train_loader = MultitaskDataLoader(args.task_names, train)
+        dev_loaders = [dataset.loader for dataset in dev]
+
         logger.info(f"{self.model}\n")
         if dist.is_initialized():
-            self.model = DDP(self.model, device_ids=[args.local_rank], find_unused_parameters=True)
-        self.optimizer = Adam(self.model.parameters(), args.lr, (args.mu, args.nu), args.epsilon)
-        self.scheduler = ExponentialLR(self.optimizer, args.decay**(1/args.decay_steps))
-        
+            self.model = DDP(self.model, device_ids=[args.local_rank],
+                             find_unused_parameters=True)
+        self.optimizer = Adam(self.model.parameters(), args.lr,
+                              (args.mu, args.nu), args.epsilon)
+        self.scheduler = ExponentialLR(self.optimizer,
+                                       args.decay**(1 / args.decay_steps))
+
         elapsed = timedelta()
-        best_e = {task_name: 1 for task_name in args.task_names}
-        best_metric = {task_name: Metric() for task_name in args.task_names}
+        best_e = {tname: 1 for tname in args.task_names + ['total']}
+        best_metrics = {tname: Metric() for tname in args.task_names + ['total']}
 
         for epoch in range(1, args.epochs + 1):
             start = datetime.now()
 
             logger.info(f"Epoch {epoch} / {args.epochs}:")
-            train_loader = MultitaskDataLoader(args.task_names, train)
-            self._train(train_loader)
-            
-            for task_name, dev_data in zip(args.task_names, dev):
-                loss, dev_metric = self._evaluate(dev_data.loader, task_name)
-                logger.info(f"{task_name:6} - {'dev:':6} - loss: {loss:.4f} - {dev_metric}")
-        
-                # save the model if it is the best so far
-                if dev_metric > best_metric[task_name]:
-                    best_e[task_name], best_metric[task_name] = epoch, dev_metric
-                    if is_master():
-                        self.save(f"{args.path}_{task_name}")
-                        logger.info(f"Saving model for {task_name}")
-                        saved = True
-                
-            # loss, test_metric = self._evaluate(test.loader)
-            # logger.info(f"{'test:':6} - loss: {loss:.4f} - {test_metric}")
 
-            
-            for task_name in args.task_names:
-                logger.info(f"{task_name:4} - Best epoch {best_e[task_name]} - {best_metric[task_name]}")
-            
+            if args.joint_loss:
+                self._joint_train(train_loader)
+            else:
+                train_loader = MultitaskDataLoader(args.task_names, train)
+                self._train(train_loader)
+
+            losses, metrics = self._multi_evaluate(dev_loaders)
+
+            for tname in best_e:
+                logger.info(f"{tname:6} - {'dev:':6} - loss: {losses[tname]:.4f} - {metrics[tname]}")
+                if metrics[tname] > best_metrics[tname]:
+                    best_e[tname] = epoch
+                    best_metrics[tname] = metrics[tname]
+                    if is_master():
+                        model_path = args.path / f"{tname}.model"
+                        self.save(model_path)
+                        logger.info(f"Saved model for {tname}")
+
+            for task_name in best_e:
+                logger.info(f"{task_name:4} - Best epoch {best_e[task_name]} - {best_metrics[task_name]}")
+
             t = datetime.now() - start
             logger.info(f"{t}s elapsed\n")
             elapsed += t
             if epoch - max(best_e.values()) >= args.patience:
                 break
-        
-        original_path = args.path
+
         for task_name, test_data in zip(args.task_names, test):
             logger.info(f"Task Name: {task_name}")
-            args.path = f"{args.path}_{task_name}"
-            loss, metric = self.load(**args)._evaluate(test_data.loader, task_name)
-            args.path = original_path
+            model_path = args.path / f"{tname}.model"
+            model = self.load(path=model_path, **args)
+            loss, metric = model._evaluate(test_data.loader, task_name)
 
             logger.info(f"Epoch {best_e[task_name]} saved")
-            logger.info(f"{'dev:':6} - {best_metric[task_name]}")
+            logger.info(f"{'dev:':6} - {best_metrics[task_name]}")
             logger.info(f"{'test:':6} - {metric}")
             logger.info(f"{elapsed}s elapsed, {elapsed / epoch}s/epoch")
-
-        
 
     def evaluate(self, data, buckets=8, batch_size=5000, punct=False, tree=True,
                  proj=False, partial=False, verbose=True, **kwargs):
@@ -244,6 +252,47 @@ class MultiBiaffineDependencyParser(Parser):
                 f"lr: {self.scheduler.get_last_lr()[0]:.4e} - loss: {loss:.4f} - {metric}"
             )
 
+    def _joint_train(self, loader):
+        self.model.train()
+        bar, metric = progress_bar(loader), AttachmentMetric()
+        for inputs, targets in bar:
+            words, feats = inputs.values()
+            self.optimizer.zero_grad()
+            mask = words.ne(self.WORD.pad_index)
+            # ignore the first token of each sentence
+            mask[:, 0] = 0
+            shared_out = self.model.shared_forward(words, feats)
+            losses = []
+            s_arcs, s_rels = {}, {}
+            for t_name, t_targets in targets.items():
+                arcs, rels = t_targets['arcs'], t_targets['rels']
+                s_arc, s_rel = self.model.unshared_forward(shared_out, t_name)
+                s_arcs[t_name], s_rels[t_name] = s_arc, s_rel
+                loss = self.model.loss(s_arc, s_rel, arcs, rels, mask,
+                                       self.args.partial)
+                losses.append(loss)
+
+            # loss = self.model.joint_loss(losses)
+            joint_loss = sum(losses)
+            joint_loss.backward()
+            nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)
+            self.optimizer.step()
+            self.scheduler.step()
+
+            # for t_name, t_targets in targets.items():
+            #     arcs, rels = t_targets['arcs'], t_targets['rels']
+            #     s_arc, s_rel = s_arcs[t_name], s_rels[t_name]
+            #     arc_preds, rel_preds = self.model.decode(s_arc, s_rel, mask)
+            #     if self.args.partial:
+            #         mask &= arcs.ge(0)
+            #     # ignore all punctuation if not specified
+            #     if not self.args.punct:
+            #         mask &= words.unsqueeze(-1).ne(self.puncts).all(-1)
+            #     metric(arc_preds, rel_preds, arcs, rels, mask)
+            bar.set_postfix_str(
+                f"lr: {self.scheduler.get_last_lr()[0]:.4e} - loss: {joint_loss:.4f} - {metric}"
+            )
+
     @torch.no_grad()
     def _evaluate(self, loader, task_name):
         self.model.eval()
@@ -270,6 +319,44 @@ class MultiBiaffineDependencyParser(Parser):
         total_loss /= len(loader)
 
         return total_loss, metric
+
+    @torch.no_grad()
+    def _multi_evaluate(self, loaders):
+        """This will evalaute the dataloaders for each task and return a joint
+        metric as well as task specific metrics
+
+        Args:
+            loaders (List[supar.utils.DataLoader]): List of data loaders. Currently
+                only simply multitask loaders are supported.
+                TODO: Also supported joint loaders. That will save computation time 
+                as shared layers will be forwarded only once.
+        """
+        task_names = self.args.task_names + ['total']
+        losses = {tname: 1 for tname in task_names}
+        metrics = {tname: AttachmentMetric() for tname in task_names}
+
+        for task_name, loader in zip(self.args.task_names, loaders):
+            for words, feats, arcs, rels in loader:
+                mask = words.ne(self.WORD.pad_index)
+                mask[:, 0] = 0
+                s_arc, s_rel = self.model(words, feats, task_name)
+                loss = self.model.loss(s_arc, s_rel, arcs, rels, mask,
+                                   self.args.partial)
+                arc_preds, rel_preds = self.model.decode(s_arc, s_rel, mask,
+                                                        self.args.tree,
+                                                        self.args.proj)
+                if self.args.partial:
+                    mask &= arcs.ge(0)
+                # ignore all punctuation if not specified
+                if not self.args.punct:
+                    mask &= words.unsqueeze(-1).ne(self.puncts).all(-1)
+                # Update losses and metrics
+                losses['total'] += loss.item()
+                losses[task_name] += loss.item()
+                metrics['total'](arc_preds, rel_preds, arcs, rels, mask)
+                metrics[task_name](arc_preds, rel_preds, arcs, rels, mask)
+
+        return losses, metrics
 
     @torch.no_grad()
     def _predict(self, loader):
@@ -305,15 +392,18 @@ class MultiBiaffineDependencyParser(Parser):
     @classmethod
     def build(cls, path, min_freq=2, fix_len=20, **kwargs):
         r"""
-        Build a brand-new Parser, including initialization of all data fields and model parameters.
+        Build a brand-new Parser, including initialization of all data fields and 
+        model parameters.
 
         Args:
             path (str):
                 The path of the model to be saved.
             min_freq (str):
-                The minimum frequency needed to include a token in the vocabulary. Default: 2.
+                The minimum frequency needed to include a token in the vocabulary. 
+                Default: 2.
             fix_len (int):
-                The max length of all subword pieces. The excess part of each piece will be truncated.
+                The max length of all subword pieces. The excess part of each piece 
+                will be truncated.
                 Required if using CharLSTM/BERT.
                 Default: 20.
             kwargs (dict):
@@ -351,7 +441,6 @@ class MultiBiaffineDependencyParser(Parser):
         else:
             transform = CoNLL(FORM=WORD, CPOS=FEAT, HEAD=ARC, DEPREL=REL)
 
-
         # HACK for creating a combined train object.
         # TODO: Think of something better. This is UGLY af
         train = [Dataset(transform, train_f, **args) for train_f in args.train]
@@ -359,7 +448,8 @@ class MultiBiaffineDependencyParser(Parser):
         for i in range(1, len(train)):
             combined_train.sentences += train[i].sentences
 
-        WORD.build(combined_train, args.min_freq, (Embedding.load(args.embed, args.unk) if args.embed else None))
+        WORD.build(combined_train, args.min_freq,
+                   (Embedding.load(args.embed, args.unk) if args.embed else None))
         FEAT.build(combined_train)
         REL.build(combined_train)
         args.update({

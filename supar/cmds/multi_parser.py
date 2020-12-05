@@ -28,6 +28,7 @@ def main():
     subparser.add_argument('--n-embed', default=100, type=int, help='dimension of embeddings')
     subparser.add_argument('--bert', default='bert-base-cased', help='which bert model to use')
     subparser.add_argument('--share-mlp', action='store_true', help='whether to share mlp')
+    subparser.add_argument('--joint-loss', action='store_true', help='Model joint loss')
     # evaluate
     subparser = subparsers.add_parser('evaluate', help='Evaluate the specified parser and dataset.')
     subparser.add_argument('--punct', action='store_true', help='whether to include punctuation')
