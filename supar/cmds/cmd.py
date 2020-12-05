@@ -4,6 +4,7 @@ import torch
 from supar.utils import Config
 from supar.utils.logging import init_logger, logger
 from supar.utils.parallel import init_device
+from pathlib import Path
 import pudb
 
 def parse(parser):
@@ -20,10 +21,20 @@ def parse(parser):
     args = Config(**vars(args))
     Parser = args.pop('Parser')
 
+    # This code ensure that all experiment related files are present in a 
+    # directory of its own
+    # Note: The following part is additional and is not present in original supar
+    args.path = Path(args.path)
+    if args.mode == 'train':
+        args.path.mkdir(exist_ok=True)
+    else:
+        if not args.path.is_file:
+            raise Exception(f"Cannot {args.mode} as no such file exists")
+
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)
     init_device(args.device, args.local_rank)
-    init_logger(logger, f"{args.path}.{args.mode}.log")
+    init_logger(logger, args.path / f"{args.path.stem}.{args.mode}.log")
     logger.info('\n' + str(args))
 
     if args.mode == 'train':
