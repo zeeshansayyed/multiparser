@@ -243,8 +243,8 @@ class MultitaskDataLoader():
     def __init__(self, task_names, datasets, **kwargs):
 
         self.task_names = task_names
+        self.datasets = datasets
         self.lengths = [len(data.loader) for data in datasets]
-        self.iterators = [iter(data.loader) for data in datasets]
         indices = [[i] * v for i, v in enumerate(self.lengths)]
         self.task_indices = sum(indices, [])
 
@@ -254,6 +254,7 @@ class MultitaskDataLoader():
 
     def __iter__(self):
         self._reset()
+        self.iterators = [iter(data.loader) for data in self.datasets]
         return self
 
     def __len__(self):
