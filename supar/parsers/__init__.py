@@ -3,7 +3,6 @@
 from .constituency import CRFConstituencyParser
 from .dependency import (BiaffineDependencyParser, CRF2oDependencyParser,
                          CRFDependencyParser, CRFNPDependencyParser)
-# from .multi_biaffine_dependency import MultiBiaffineDependencyParser
 from .multiparsers import MultiBiaffineDependencyParser                 
 from .parser import Parser
 
