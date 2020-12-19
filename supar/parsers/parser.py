@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import abc
 from datetime import datetime, timedelta
 
 import supar
@@ -16,7 +17,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
 
-class Parser(object):
+class Parser(abc.ABC):
 
     NAME = None
     MODEL = None
@@ -139,13 +140,16 @@ class Parser(object):
 
         return dataset
 
+    @abc.abstractmethod
     def _train(self, loader):
         raise NotImplementedError
 
     @torch.no_grad()
+    @abc.abstractmethod
     def _evaluate(self, loader):
         raise NotImplementedError
 
+    @abc.abstractmethod
     @torch.no_grad()
     def _predict(self, loader):
         raise NotImplementedError
