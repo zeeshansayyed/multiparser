@@ -74,29 +74,30 @@ class MultiBiaffineDependencyModel(nn.Module):
                          dropout=lstm_dropout)
         self.lstm_dropout = SharedDropout(p=lstm_dropout)
 
-        # the MLP layers
+        # Create the MLP Layers
         if not self.args.share_mlp:
-            mlp_arc_d = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
-            mlp_arc_h = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
-            mlp_rel_d = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_rel, dropout=mlp_dropout)
-            mlp_rel_h = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_rel, dropout=mlp_dropout)
-            self.mlp_arc_d = nn.ModuleDict({task: mlp_arc_d for task in task_names})
-            self.mlp_arc_h = nn.ModuleDict({task: mlp_arc_h for task in task_names})
-            self.mlp_rel_d = nn.ModuleDict({task: mlp_rel_d for task in task_names})
-            self.mlp_rel_h = nn.ModuleDict({task: mlp_rel_h for task in task_names})
+            mlp_arc_d, mlp_arc_h, mlp_rel_d, mlp_rel_h = {}, {}, {}, {}
+            for task in task_names:
+                mlp_arc_d[task] = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
+                mlp_arc_h[task] = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
+                mlp_rel_d[task] = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_rel, dropout=mlp_dropout)
+                mlp_rel_h[task] = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_rel, dropout=mlp_dropout)
+            self.mlp_arc_d = nn.ModuleDict(mlp_arc_d)
+            self.mlp_arc_h = nn.ModuleDict(mlp_arc_h)
+            self.mlp_rel_d = nn.ModuleDict(mlp_rel_d)
+            self.mlp_rel_h = nn.ModuleDict(mlp_rel_h)
         else:
             self.mlp_arc_d = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
             self.mlp_arc_h = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_arc, dropout=mlp_dropout)
             self.mlp_rel_d = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_rel, dropout=mlp_dropout)
             self.mlp_rel_h = MLP(n_in=n_lstm_hidden*2, n_out=n_mlp_rel, dropout=mlp_dropout)
 
-        # the Biaffine layers
-        arc_attn = Biaffine(n_in=n_mlp_arc, bias_x=True, bias_y=False)
-        rel_attn = Biaffine(n_in=n_mlp_rel, n_out=n_rels, bias_x=True, bias_y=True)
-        
-        # Task Specific Biaffine layers
-        self.arc_attn = nn.ModuleDict({task: arc_attn for task in task_names})
-        self.rel_attn = nn.ModuleDict({task: rel_attn for task in task_names})
+        arc_attn, rel_attn = {}, {}
+        for task_n_rels, task in zip(n_rels, task_names):
+            arc_attn[task] = Biaffine(n_in=n_mlp_arc, bias_x=True, bias_y=False)
+            rel_attn[task] = Biaffine(n_in=n_mlp_rel, n_out=task_n_rels, bias_x=True, bias_y=True)
+        self.arc_attn = nn.ModuleDict(arc_attn)
+        self.rel_attn = nn.ModuleDict(rel_attn)
 
         self.criterion = nn.CrossEntropyLoss()
         self.pad_index = pad_index
@@ -107,6 +108,23 @@ class MultiBiaffineDependencyModel(nn.Module):
             self.pretrained = nn.Embedding.from_pretrained(embed)
             nn.init.zeros_(self.word_embed.weight)
         return self
+
+    def get_shared_parameters(self):
+        for name, param in self.named_parameters():
+            if not (('arc_attn' in name) or ('rel_attn' in name) or
+                    (self.args.share_mlp and 'mlp' in name)):
+                yield param
+
+    def get_task_specific_parameters(self, task_name):
+        for name, param in self.named_parameters():
+            if task_name in name.split('.'):
+                yield param
+
+    def freeze_shared(self):
+        for name, param in self.named_parameters():
+            if not (('arc_attn' in name) or ('rel_attn' in name) or
+                    (self.args.share_mlp and 'mlp' in name)):
+                param.requires_grad = False
 
     def shared_forward(self, words, feats):
         batch_size, seq_len = words.shape
