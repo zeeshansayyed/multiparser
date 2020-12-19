@@ -56,6 +56,16 @@ class AttachmentMetric(Metric):
         self.correct_rels += rel_mask_seq.sum().item()
         return self
 
+    def __add__(self, other):
+        new_metric = AttachmentMetric()
+        new_metric.n = self.n + other.n
+        new_metric.n_ucm = self.n_ucm + other.n_ucm
+        new_metric.n_lcm = self.n_lcm + other.n_lcm
+        new_metric.total = self.total + other.total
+        new_metric.correct_arcs = self.correct_arcs + other.correct_arcs
+        new_metric.correct_rels = self.correct_rels + other.correct_rels
+        return new_metric
+
     @property
     def score(self):
         return self.las
