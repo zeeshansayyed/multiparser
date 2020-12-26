@@ -35,74 +35,74 @@ class MultiTaskParser(Parser):
         super().__init__(args, model, transform)
         self.transforms = self.transform
 
-    def train_loop(self, train_loader, dev_loaders, test_loaders, args,
-                   train_mode='train', save_prefix=None):
+    def train_loop(self, task_names, train_loader, dev_loaders, test_loaders,
+                   args, train_mode='train', save_prefix=None):
+        assert len(task_names) == len(dev_loaders) == len(test_loaders)
+
         if train_mode == 'finetune':
             lr = args.lr / 10
         else:
             lr = args.lr
+            task_names = task_names + ['total']
 
-        self.optimizer = MultiTaskOptimizer(self.model, args.task_names,
+        self.optimizer = MultiTaskOptimizer(self.model, task_names,
                                             args.optimizer_type, lr, args.mu,
                                             args.nu, args.epsilon)
         self.scheduler = MultiTaskScheduler(self.optimizer, **args)
 
         elapsed = timedelta()
-        best_e = {tname: 1 for tname in self.args.task_names + ['total']}
-        best_metrics = {
-            tname: AttachmentMetric()
-            for tname in self.args.task_names + ['total']
-        }
+        best_e = {tname: 1 for tname in task_names}
+        best_metrics = {tname: AttachmentMetric() for tname in task_names}
 
         for epoch in range(1, args.epochs + 1):
             start = datetime.now()
             logger.info(f"Epoch {epoch} / {args.epochs}:")
-
             self._train(train_loader, train_mode=train_mode)
+            losses, metrics = self._multi_evaluate(dev_loaders, task_names)
 
-            losses, metrics = self._new_multi_evaluate(dev_loaders)
-
-            for tname in best_e:
-                logger.info(
-                    f"{tname:6} - {'dev:':6} - loss: {losses[tname]:.4f} - {metrics[tname]}"
-                )
+            for tname in task_names:
+                logger.info(f"{tname:6} - {'dev:':6} - loss: {losses[tname]:.4f} - {metrics[tname]}")
                 if metrics[tname] > best_metrics[tname]:
                     best_e[tname] = epoch
                     best_metrics[tname] = metrics[tname]
                     if is_master():
                         if save_prefix:
-                            model_path = self.args.exp_dir / f"{save_prefix}-{tname}.model"
+                            model_name = f"{save_prefix}-{tname}.model"
                         else:
-                            model_path = self.args.exp_dir / f"{tname}.model"
+                            model_name = f"{tname}.model"
+                        model_path = args.exp_dir / model_name
                         self.save(model_path)
-                        logger.info(f"Saved model for {tname}")
+                        logger.info(f"Saved model: {model_path}")
 
-            for task_name in best_e:
-                logger.info(
-                    f"{task_name:4} - Best epoch {best_e[task_name]} - {best_metrics[task_name]}"
-                )
+            for tname in task_names:
+                if save_prefix:
+                    model_name = f"{save_prefix}-{tname}.model"
+                else:
+                    model_name = f"{tname}.model"
+                logger.info(f"{model_name:4} - Best epoch {best_e[tname]} - {best_metrics[tname]}")
 
             t = datetime.now() - start
             logger.info(f"{t}s elapsed\n")
             elapsed += t
-            if epoch - max(best_e.values()) >= self.args.patience:
+            if epoch - max(best_e.values()) >= args.patience:
                 break
 
-        for task_name, test_loader in zip(args.task_names, test_loaders):
-            logger.info(f"Task Name: {task_name}")
-            args.path = args.exp_dir / f"{task_name}.model"
-            loss, metric = self.load(**args)._evaluate(test_loader, task_name)
+        logger.info(f"{train_mode}ing completed")
+        for tname, test_loader in zip(task_names, test_loaders):
+            logger.info(f"Task Name: {tname}")
+            args.path = args.exp_dir / f"{tname}.model"
+            loss, metric = self.load(**args)._evaluate(test_loader, tname)
 
-            logger.info(f"Epoch {best_e[task_name]} saved")
-            logger.info(f"{'dev:':6} - {best_metrics[task_name]}")
+            logger.info(f"Epoch {best_e[tname]} saved")
+            logger.info(f"{'dev:':6} - {best_metrics[tname]}")
             logger.info(f"{'test:':6} - {metric}")
-            logger.info(f"{elapsed}s elapsed, {elapsed / epoch}s/epoch")
+            logger.info(f"{elapsed}s elapsed, {elapsed / epoch}s/epoch\n")
 
         return best_metrics
 
     def train(self, train, dev, test, train_mode='train', buckets=32,
               batch_size=5000, lr=2e-3, mu=.9, nu=.9, epsilon=1e-12, clip=5.0,
-              decay=.75, decay_steps=5000, epochs=5000, patience=100, verbose=True,
+              decay=.75, decay_steps=5000, epochs=5, patience=100, verbose=True,
               **kwargs):
 
         args = Config().update(locals())
@@ -132,10 +132,10 @@ class MultiTaskParser(Parser):
                         f"{'test:':6} {testD}\n")
 
         if args.joint_loss:
-            train = JointDataset(train, args.task_names)
-            train.build(args.batch_size, args.buckets, True,
+            joint_train = JointDataset(train, args.task_names)
+            joint_train.build(args.batch_size, args.buckets, True,
                         dist.is_initialized())
-            train_loader = train.loader
+            train_loader = joint_train.loader
         else:
             train_loader = MultitaskDataLoader(args.task_names, train)
 
@@ -148,35 +148,41 @@ class MultiTaskParser(Parser):
                              find_unused_parameters=True)
 
         if train_mode == 'train':
-            train_metrics = self.train_loop(train_loader, dev_loaders,
-                                            test_loaders, args)
+            train_metrics = self.train_loop(args.task_names, train_loader,
+                                            dev_loaders, test_loaders, args)
         else:
-            _, train_metrics = self._new_multi_evaluate(dev_loaders)
+            _, train_metrics = self._multi_evaluate(dev_loaders, args.task_names)
 
         if args.finetune or train_mode == 'finetune':
             logger.info("Starting Finetuning ...")
-            finetuned_metrics = {}
-            for task_name in train_metrics:
-                args.path = args.exp_dir / f"{task_name}.model"
-                logger.info(f"Finetuning model: {task_name}.model")
-                # self.load(**args).train_loop(args, train_mode='finetune')
-                parser = self.load(**args)
-                # self.model = self.MODEL(**self.args)
-                # self.model.load_pretrained(self.WORD.embed).to(args.device)
-                if args.finetune == 'partial':
-                    parser.model.freeze_shared()
-                finetuned_metrics[task_name] = parser.train_loop(
-                    train_loader, dev_loaders, test_loaders, args,
-                    train_mode='finetune',
-                    save_prefix=f'{args.finetune}-{task_name}')
+            finetuned_metrics = {tname: {} for tname in train_metrics.keys()}
+            for start_task in train_metrics.keys():
+                for task_id, finetune_task in enumerate(args.task_names):
+                    logger.info(f"Finetuning model: {start_task}.model with {finetune_task} data")
+                    args.path = args.exp_dir / f"{start_task}.model"
+                    parser = self.load(**args)
+                    if args.finetune == 'partial':
+                        parser.model.freeze_shared()
+                    # Choose only one element from the list
+                    finetune_task_list = args.task_names[task_id: task_id + 1]
+                    finetune_train_loader = MultitaskDataLoader(finetune_task_list, train[task_id: task_id + 1])
+                    finetune_dev_loaders = dev_loaders[task_id: task_id + 1]
+                    finetune_test_loaders = test_loaders[task_id: task_id + 1]
+                    finetuned_metrics[start_task].update(
+                        parser.train_loop(
+                            finetune_task_list,
+                            finetune_train_loader,
+                            finetune_dev_loaders,
+                            finetune_test_loaders,
+                            args,
+                            train_mode='finetune',
+                            save_prefix=f'{args.finetune}-{start_task}',
+                        ))
 
-            for task_name, tmetrics in train_metrics.items():
-                logger.info(f"Dev Metrics for {task_name}: {tmetrics}")
-                for finetuned_task_name, fmetrics in finetuned_metrics[
-                        task_name].items():
-                    logger.info(
-                        f"Dev Metrics for {task_name}-{finetuned_task_name}: {fmetrics}"
-                    )
+            for start_task, tmetrics in train_metrics.items():
+                logger.info(f"Dev Metrics for {start_task}: {tmetrics}")
+                for finetuned_task_name, fmetrics in finetuned_metrics[start_task].items():
+                    logger.info(f"Dev Metrics for {start_task}-{finetuned_task_name}: {fmetrics}")
 
     def evaluate(self, data, buckets=8, batch_size=5000, **kwargs):
         args = self.args.update(locals())
@@ -238,7 +244,7 @@ class MultiTaskParser(Parser):
 
     @torch.no_grad()
     @abc.abstractmethod
-    def _multi_evaluate(self, loaders):
+    def _multi_evaluate(self, loaders, task_names):
         raise NotImplementedError
 
 
@@ -357,6 +363,9 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         self.model.eval()
         total_loss, metric = 0, AttachmentMetric()
 
+        if task_name not in self.model.args.task_names:
+            return total_loss, metric
+
         for words, feats, arcs, rels in loader:
             mask = words.ne(self.WORD.pad_index)
             # ignore the first token of each sentence
@@ -379,7 +388,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         return total_loss, metric
 
     @torch.no_grad()
-    def _multi_evaluate(self, loaders):
+    def _old_multi_evaluate(self, loaders):
         """This will evalaute the dataloaders for each task and return a joint
         metric as well as task specific metrics
 
@@ -418,14 +427,12 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         return losses, metrics
 
     @torch.no_grad()
-    def _new_multi_evaluate(self, loaders):
-        task_names = self.args.task_names
+    def _multi_evaluate(self, loaders, task_names):
         losses = {tname: 1 for tname in task_names}
         metrics = {tname: AttachmentMetric() for tname in task_names}
 
-        for loader, task_name in zip(loaders, self.args.task_names):
-            losses[task_name], metrics[task_name] = self._evaluate(
-                loader, task_name)
+        for loader, tname in zip(loaders, task_names):
+            losses[tname], metrics[tname] = self._evaluate(loader, tname)
 
         losses['total'] = sum(losses.values())
         total_metric = AttachmentMetric()
