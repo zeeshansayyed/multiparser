@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import time
 from pathlib import Path
+import random
 
 import torch
 from supar.utils import Config
@@ -27,29 +28,47 @@ def parse(parser):
     # directory of its own
     # Note: The following part is additional and is not present in original supar
     args.path = Path(args.path)
-    if args.mode == 'train':
-        args.path.mkdir(exist_ok=True)
-        args.exp_dir = args.path
-        args.path = args.path / 'best.model'
+
+    if args.path.is_file():
+        args.exp_dir = args.path.parent
     else:
-        if args.path.is_file:
-            args.exp_dir = args.path.parent
-        else:
-            raise Exception(f"Cannot {args.mode} as no such file exists")
+        args.exp_dir = args.path
+
+    if args.mode == 'train':
+        args.exp_dir.mkdir(parents=True, exist_ok=True)
+
+    # if args.mode == 'train':
+    #     args.path.mkdir(parents=True, exist_ok=True)
+    #     args.exp_dir = args.path
+    #     args.path = args.path / 'best.model'
+    # else:
+    #     if args.path.is_file:
+    #         args.exp_dir = args.path.parent
+    #     else:
+    #         args.exp_dir = args.path
+    #         # raise Exception(f"Cannot {args.mode} as no such file exists")
 
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)
+    random.seed(args.seed)
     init_device(args.device, args.local_rank)
-    ts = time.localtime()
-    ts = time.strftime("%Y-%m-%d--%H:%M:%S", ts)
-    init_logger(logger, args.exp_dir / f"{args.mode}-{ts}.log")
+    if args.mode == 'train':
+        ts = time.localtime()
+        ts = time.strftime("%Y-%m-%d--%H:%M:%S", ts)
+        init_logger(logger, args.exp_dir / f"{args.mode}-{ts}.log")
+    else:
+        init_logger(logger, args.exp_dir / f"{args.mode}.log")
     logger.info('\n' + str(args))
 
     if args.mode == 'train':
         parser = Parser.build(**args)
         parser.train(**args)
     elif args.mode == 'evaluate':
+        # if args.path.is_file():
         parser = Parser.load(args.path)
+        # else:
+        # args.build = True
+        # parser = Parser.build(**args)
         parser.evaluate(**args)
     elif args.mode == 'predict':
         parser = Parser.load(args.path)

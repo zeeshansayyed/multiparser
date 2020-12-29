@@ -45,7 +45,8 @@ class MultiTaskParser(Parser):
             lr = args.lr
             task_names = task_names + ['total']
 
-        self.optimizer = MultiTaskOptimizer(self.model, task_names,
+
+        self.optimizer = MultiTaskOptimizer(self.model, args.task_names,
                                             args.optimizer_type, lr, args.mu,
                                             args.nu, args.epsilon)
         self.scheduler = MultiTaskScheduler(self.optimizer, **args)
@@ -102,7 +103,7 @@ class MultiTaskParser(Parser):
 
     def train(self, train, dev, test, train_mode='train', buckets=32,
               batch_size=5000, lr=2e-3, mu=.9, nu=.9, epsilon=1e-12, clip=5.0,
-              decay=.75, decay_steps=5000, epochs=5, patience=100, verbose=True,
+              decay=.75, decay_steps=5000, epochs=5000, patience=100, verbose=True,
               **kwargs):
 
         args = Config().update(locals())
@@ -191,20 +192,36 @@ class MultiTaskParser(Parser):
         for transform in self.transforms:
             transform.train()
 
-        logger.info("Loading the data")
-        dataset = Dataset(self.transforms[0], data)
-        dataset.build(args.batch_size, args.buckets)
-        logger.info(f"\n{dataset}")
+        if args.path.is_file():
+            paths = [args.path]
+        else:
+            paths = []
 
-        logger.info("Evaluating the dataset")
-        start = datetime.now()
-        loss, metric = self._evaluate(dataset.loader, self.args.task_names[0])
-        elapsed = datetime.now() - start
-        logger.info(f"loss: {loss:.4f} - {metric}")
-        logger.info(
-            f"{elapsed}s elapsed, {len(dataset)/elapsed.total_seconds():.2f} Sents/s"
-        )
-
+        for task, data_list in zip(args.task, args.data):
+            # args.task_names was saved in parser while training
+            # args.task was provided as cmd line args while evaluation
+            task_id = args.task_names.index(task)
+            if not args.path.is_file():
+                paths = []
+                paths += list(args.path.glob(f"*-{task}.model"))
+                paths += list(args.path.glob('total.model'))
+                paths += list(args.path.glob(f'{task}.model'))
+            for data in data_list:
+                # data = Path(data)
+                # logger.info(f"Loading {data}")
+                dataset = Dataset(self.transforms[task_id], data, proj=args.proj)
+                dataset.build(args.batch_size, args.buckets)
+                # logger.info(f"\n{dataset}")
+                for path in paths:
+                    parser = self.load(path)
+                    # logger.info(f"Evaluating {data} with model: {path.stem}")
+                    start = datetime.now()
+                    loss, metric = parser._evaluate(dataset.loader, task)
+                    elapsed = datetime.now() - start
+                    logger.info(f"Data={os.path.split(data)[-1]}\tModel={path.name}\tMetric={metric}")
+                    # \tloss={loss:.4f}
+                    # logger.info(f"{elapsed}s elapsed, {len(dataset)/elapsed.total_seconds():.2f} Sents/s")
+                
         return loss, metric
 
     def predict(self, data, pred=None, buckets=8, batch_size=5000, prob=False,
@@ -212,30 +229,61 @@ class MultiTaskParser(Parser):
         args = self.args.update(locals())
         init_logger(logger, verbose=args.verbose)
 
-        self.transforms[0].eval()
-        if args.prob:
-            self.transform.append(Field('probs'))
+        for transform in self.transforms:
+            transform.eval()
+            if args.prob:
+                transform.append(Field('probs'))
 
-        logger.info("Loading the data")
-        dataset = Dataset(self.transform[0], data)
-        dataset.build(args.batch_size, args.buckets)
-        logger.info(f"\n{dataset}")
+        # self.transforms[0].eval()
+        # if args.prob:
+        #     self.transform.append(Field('probs'))
 
-        logger.info("Making predictions on the dataset")
-        start = datetime.now()
-        preds = self._predict(dataset.loader, self.args.task_names[0])
-        elapsed = datetime.now() - start
 
-        for name, value in preds.items():
-            setattr(dataset, name, value)
-        if pred is not None and is_master():
-            logger.info(f"Saving predicted results to {pred}")
-            self.transform[0].save(pred, dataset.sentences)
-        logger.info(
-            f"{elapsed}s elapsed, {len(dataset) / elapsed.total_seconds():.2f} Sents/s"
-        )
+        for task, data_list in zip(args.task, args.data):
+            # args.task_names was saved in parser while training
+            # args.task was provided as cmd line args while evaluation
+            task_id = args.task_names.index(task)
+            transform = self.transforms[task_id]
+            if args.path.is_file():
+                paths = [args.path]
+            else:
+                paths = []
+                paths += list(args.path.glob(f"*-{task}.model"))
+                paths += list(args.path.glob('total.model'))
+                paths += list(args.path.glob(f'{task}.model'))
+            print(paths)
+            for data in data_list:
+                logger.info("Loading the data")
+                dataset = Dataset(transform, data)
+                dataset.build(args.batch_size, args.buckets)
+                logger.info(f"\n{dataset}")
+                for path in paths:
+                    parser = self.load(path)
+                    print(path)
+                    logger.info(f"Making predictions on {data} using {path.name}")
+                    start = datetime.now()
+                    preds = self._predict(dataset.loader, task)
+                    elapsed = datetime.now() - start
+
+                    for name, value in preds.items():
+                        setattr(dataset, name, value)
+                    if is_master():
+                        if args.pred is None:
+                            pred = args.exp_dir / f"{path.stem}-{os.path.split(data)[-1]}"
+                        logger.info(f"Saving predicted results to {pred}")
+                        transform.save(pred, dataset.sentences)
+                    logger.info(f"{elapsed}s elapsed, {len(dataset) / elapsed.total_seconds():.2f} Sents/s")
 
         return dataset
+
+    @classmethod
+    def load(cls, path, **kwargs):
+        if path.is_file():
+            # return super(Parser, cls).load(path, **kwargs)
+            return super().load(path, **kwargs)
+        else:
+            for p in path.glob('*.model'):
+                return super().load(p, **kwargs)
 
     @torch.no_grad()
     @abc.abstractmethod
@@ -384,7 +432,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
             total_loss += loss.item()
             metric(arc_preds, rel_preds, arcs, rels, mask)
         total_loss /= len(loader)
-
+        # logger.info(f"Inside Evaluate: {task_name} - {metric}")
         return total_loss, metric
 
     @torch.no_grad()
