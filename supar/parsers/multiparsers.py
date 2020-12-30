@@ -153,6 +153,12 @@ class MultiTaskParser(Parser):
                                             dev_loaders, test_loaders, args)
         else:
             _, train_metrics = self._multi_evaluate(dev_loaders, args.task_names)
+            logger.info("Dev Metrics before finetuning")
+            for tname, dev_loader in zip(args.task_names, dev_loaders):
+                logger.info(f"Task Name: {tname}")
+                args.path = args.exp_dir / f"{tname}.model"
+                loss, metric = self.load(**args)._evaluate(dev_loader, tname)
+                logger.info(f"{tname:5}: {metric}")
 
         if args.finetune or train_mode == 'finetune':
             logger.info("Starting Finetuning ...")
@@ -401,7 +407,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
             )
 
     def _train(self, loader, train_mode='train'):
-        if self.args.joint_loss:
+        if self.args.joint_loss and self.args.train_mode == 'train':
             self._joint_train(loader, train_mode=train_mode)
         else:
             self._separate_train(loader, train_mode=train_mode)
