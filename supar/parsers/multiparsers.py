@@ -119,8 +119,8 @@ class MultiTaskParser(Parser):
         for train_f, dev_f, test_f, transform in zip(args.train, args.dev,
                                                      args.test, self.transforms):
             train.append(Dataset(transform, train_f, **args))
-            dev.append(Dataset(transform, dev_f, **args))
-            test.append(Dataset(transform, test_f, **args))
+            dev.append(Dataset(transform, dev_f))
+            test.append(Dataset(transform, test_f))
 
         for trainD, devD, testD, tname in zip(train, dev, test, args.task_names):
             logger.info(f"Building for {tname}")
@@ -192,41 +192,40 @@ class MultiTaskParser(Parser):
                     logger.info(f"Dev Metrics for {start_task}-{finetuned_task_name}: {fmetrics}")
 
     def evaluate(self, data, buckets=8, batch_size=5000, **kwargs):
+        """
+        If a model file is specified in the --path argument, then that model is 
+        loaded and evaluated. Instead, if the experiment directory is specified, 
+        then a random .model file is first loaded to set things up. Then all 
+        .model files present in directory are evaluated in the following fashion:
+            - {task}.model is tested on {task} data
+            - total.model is tested on all provided data
+            - Model ending with "*-{task}.model" are tested on {task}
+        """
         args = self.args.update(locals())
         init_logger(logger, verbose=args.verbose)
 
         for transform in self.transforms:
             transform.train()
 
-        if args.path.is_file():
-            paths = [args.path]
-        else:
-            paths = []
-
         for task, data_list in zip(args.task, args.data):
             # args.task_names was saved in parser while training
             # args.task was provided as cmd line args while evaluation
             task_id = args.task_names.index(task)
-            if not args.path.is_file():
+            if args.path.is_file():
+                paths = [args.path]
+            else:
                 paths = []
                 paths += list(args.path.glob(f"*-{task}.model"))
                 paths += list(args.path.glob('total.model'))
                 paths += list(args.path.glob(f'{task}.model'))
             for data in data_list:
-                # data = Path(data)
-                # logger.info(f"Loading {data}")
                 dataset = Dataset(self.transforms[task_id], data, proj=args.proj)
                 dataset.build(args.batch_size, args.buckets)
-                # logger.info(f"\n{dataset}")
                 for path in paths:
                     parser = self.load(path)
-                    # logger.info(f"Evaluating {data} with model: {path.stem}")
                     start = datetime.now()
                     loss, metric = parser._evaluate(dataset.loader, task)
-                    elapsed = datetime.now() - start
                     logger.info(f"Data={os.path.split(data)[-1]}\tModel={path.name}\tMetric={metric}")
-                    # \tloss={loss:.4f}
-                    # logger.info(f"{elapsed}s elapsed, {len(dataset)/elapsed.total_seconds():.2f} Sents/s")
                 
         return loss, metric
 
@@ -240,11 +239,6 @@ class MultiTaskParser(Parser):
             if args.prob:
                 transform.append(Field('probs'))
 
-        # self.transforms[0].eval()
-        # if args.prob:
-        #     self.transform.append(Field('probs'))
-
-
         for task, data_list in zip(args.task, args.data):
             # args.task_names was saved in parser while training
             # args.task was provided as cmd line args while evaluation
@@ -257,7 +251,7 @@ class MultiTaskParser(Parser):
                 paths += list(args.path.glob(f"*-{task}.model"))
                 paths += list(args.path.glob('total.model'))
                 paths += list(args.path.glob(f'{task}.model'))
-            print(paths)
+
             for data in data_list:
                 logger.info("Loading the data")
                 dataset = Dataset(transform, data)
@@ -284,6 +278,11 @@ class MultiTaskParser(Parser):
 
     @classmethod
     def load(cls, path, **kwargs):
+        """
+        If a path to a model file is specified, then it loads that model. If the 
+        experiment directory is provided in the path instead, then it randomly 
+        loads the a model file (with .model ext)
+        """
         if path.is_file():
             # return super(Parser, cls).load(path, **kwargs)
             return super().load(path, **kwargs)
@@ -297,10 +296,19 @@ class MultiTaskParser(Parser):
         raise NotImplementedError
 
     @torch.no_grad()
-    @abc.abstractmethod
     def _multi_evaluate(self, loaders, task_names):
-        raise NotImplementedError
+        losses = {tname: 1 for tname in task_names}
+        metrics = {tname: AttachmentMetric() for tname in task_names}
 
+        for loader, tname in zip(loaders, task_names):
+            losses[tname], metrics[tname] = self._evaluate(loader, tname)
+
+        losses['total'] = sum(losses.values())
+        total_metric = AttachmentMetric()
+        for m in metrics.values():
+            total_metric += m
+        metrics['total'] = total_metric
+        return losses, metrics
 
 class MultiBiaffineDependencyParser(MultiTaskParser):
 
@@ -308,6 +316,40 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
     MODEL = MultiBiaffineDependencyModel
 
     def __init__(self, args, model, transforms):
+        """
+        A CoNLL transform object takes in the following Field objects:
+	    - WORD: Word embeddings
+		 - Supposed to be build on the train set.
+		 - For MultitaskParser we build on the combined train set of
+           all tasks. This will have to change when we use different
+           languages.
+	    - FEAT: Char/Bert/POS embeddings
+		 - Just like WORD. Should be built on train set and for MTP,
+           we build on the combined train.
+	    - ARC: Arcs labels
+		 - This are word indices indicating where the arc starts and
+           where it ends.
+	    - REL: Dependency relations
+		 - These are relations different for different tasks, for
+           e.g. the ones for UD and SUD are different. This is retrieved by 
+           passing the ~ConLL.get_arcs~ function the Field constuctor
+		 - Hence, we cannot build them on ~combined_train~ just the
+           way we do for WORD and FEAT. Hence, we build it
+           individually for different train sets for each
+           corresponding task. This is what leads to different
+           transform objects for different tasks.
+
+        Hence while retrieving each of the fields in this constructor, we simply 
+        retrieve the first WORD, FEAT and ARC from the first transform. 
+
+	     In the future when we want to use the Parser for different
+         languages or for train sets from completely different domains
+         we might want to build WORD and FEAT separately for each
+         train set, the way we do for RELs.
+
+		 Also, when we move onto doing constituency and dependency, we
+         will have to see how to treat ARC.
+        """
         super().__init__(args, model, transforms)
         transform = transforms[0]
         if self.args.feat in ('char', 'bert'):
@@ -438,65 +480,68 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
             total_loss += loss.item()
             metric(arc_preds, rel_preds, arcs, rels, mask)
         total_loss /= len(loader)
-        # logger.info(f"Inside Evaluate: {task_name} - {metric}")
+
         return total_loss, metric
 
-    @torch.no_grad()
-    def _old_multi_evaluate(self, loaders):
-        """This will evalaute the dataloaders for each task and return a joint
-        metric as well as task specific metrics
+    # @torch.no_grad()
+    # def _old_multi_evaluate(self, loaders):
+    #     """This will evalaute the dataloaders for each task and return a joint
+    #     metric as well as task specific metrics
 
-        Args:
-            loaders (List[supar.utils.DataLoader]): List of data loaders. Currently
-                only simply multitask loaders are supported.
+    #     Args:
+    #         loaders (List[supar.utils.DataLoader]): List of data loaders. Currently
+    #             only simply multitask loaders are supported.
 
-        TODO:  Also supported joint loaders. That will save computation time 
-                as shared layers will be forwarded only once.
-        """
-        task_names = self.args.task_names + ['total']
-        losses = {tname: 1 for tname in task_names}
-        metrics = {tname: AttachmentMetric() for tname in task_names}
+    #     TODO:  Also supported joint loaders. That will save computation time 
+    #             as shared layers will be forwarded only once.
+    #     """
+    #     task_names = self.args.task_names + ['total']
+    #     losses = {tname: 1 for tname in task_names}
+    #     metrics = {tname: AttachmentMetric() for tname in task_names}
 
-        for task_name, loader in zip(self.args.task_names, loaders):
-            for words, feats, arcs, rels in loader:
-                mask = words.ne(self.WORD.pad_index)
-                mask[:, 0] = 0
-                s_arc, s_rel = self.model(words, feats, task_name)
-                loss = self.model.loss(s_arc, s_rel, arcs, rels, mask,
-                                       self.args.partial)
-                arc_preds, rel_preds = self.model.decode(s_arc, s_rel, mask,
-                                                         self.args.tree,
-                                                         self.args.proj)
-                if self.args.partial:
-                    mask &= arcs.ge(0)
-                # ignore all punctuation if not specified
-                if not self.args.punct:
-                    mask &= words.unsqueeze(-1).ne(self.puncts).all(-1)
-                # Update losses and metrics
-                losses['total'] += loss.item()
-                losses[task_name] += loss.item()
-                metrics['total'](arc_preds, rel_preds, arcs, rels, mask)
-                metrics[task_name](arc_preds, rel_preds, arcs, rels, mask)
+    #     for task_name, loader in zip(self.args.task_names, loaders):
+    #         for words, feats, arcs, rels in loader:
+    #             mask = words.ne(self.WORD.pad_index)
+    #             mask[:, 0] = 0
+    #             s_arc, s_rel = self.model(words, feats, task_name)
+    #             loss = self.model.loss(s_arc, s_rel, arcs, rels, mask,
+    #                                    self.args.partial)
+    #             arc_preds, rel_preds = self.model.decode(s_arc, s_rel, mask,
+    #                                                      self.args.tree,
+    #                                                      self.args.proj)
+    #             if self.args.partial:
+    #                 mask &= arcs.ge(0)
+    #             # ignore all punctuation if not specified
+    #             if not self.args.punct:
+    #                 mask &= words.unsqueeze(-1).ne(self.puncts).all(-1)
+    #             # Update losses and metrics
+    #             losses['total'] += loss.item()
+    #             losses[task_name] += loss.item()
+    #             metrics['total'](arc_preds, rel_preds, arcs, rels, mask)
+    #             metrics[task_name](arc_preds, rel_preds, arcs, rels, mask)
 
-        return losses, metrics
+    #     return losses, metrics
 
-    @torch.no_grad()
-    def _multi_evaluate(self, loaders, task_names):
-        losses = {tname: 1 for tname in task_names}
-        metrics = {tname: AttachmentMetric() for tname in task_names}
+    # @torch.no_grad()
+    # def _multi_evaluate(self, loaders, task_names):
+    #     losses = {tname: 1 for tname in task_names}
+    #     metrics = {tname: AttachmentMetric() for tname in task_names}
 
-        for loader, tname in zip(loaders, task_names):
-            losses[tname], metrics[tname] = self._evaluate(loader, tname)
+    #     for loader, tname in zip(loaders, task_names):
+    #         losses[tname], metrics[tname] = self._evaluate(loader, tname)
 
-        losses['total'] = sum(losses.values())
-        total_metric = AttachmentMetric()
-        for m in metrics.values():
-            total_metric += m
-        metrics['total'] = total_metric
-        return losses, metrics
+    #     losses['total'] = sum(losses.values())
+    #     total_metric = AttachmentMetric()
+    #     for m in metrics.values():
+    #         total_metric += m
+    #     metrics['total'] = total_metric
+    #     return losses, metrics
 
     @torch.no_grad()
     def _predict(self, loader, task_name):
+        # args.task_names was saved in parser while training
+        # args.task was provided as cmd line args while evaluation
+        task_id = self.args.task_names.index(task_name)
         self.model.eval()
 
         preds = {}
@@ -519,7 +564,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
                     for i, prob in zip(lens, arc_probs.unbind())
                 ])
         arcs = [seq.tolist() for seq in arcs]
-        rels = [self.REL[0].vocab[seq.tolist()] for seq in rels]
+        rels = [self.REL[task_id].vocab[seq.tolist()] for seq in rels]
         preds = {'arcs': arcs, 'rels': rels}
         if self.args.prob:
             preds['probs'] = probs

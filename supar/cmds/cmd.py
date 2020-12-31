@@ -28,7 +28,6 @@ def parse(parser):
     # directory of its own
     # Note: The following part is additional and is not present in original supar
     args.path = Path(args.path)
-
     if args.path.is_file():
         args.exp_dir = args.path.parent
     else:
@@ -36,17 +35,6 @@ def parse(parser):
 
     if args.mode == 'train':
         args.exp_dir.mkdir(parents=True, exist_ok=True)
-
-    # if args.mode == 'train':
-    #     args.path.mkdir(parents=True, exist_ok=True)
-    #     args.exp_dir = args.path
-    #     args.path = args.path / 'best.model'
-    # else:
-    #     if args.path.is_file:
-    #         args.exp_dir = args.path.parent
-    #     else:
-    #         args.exp_dir = args.path
-    #         # raise Exception(f"Cannot {args.mode} as no such file exists")
 
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)
@@ -64,11 +52,7 @@ def parse(parser):
         parser = Parser.build(**args)
         parser.train(**args)
     elif args.mode == 'evaluate':
-        # if args.path.is_file():
         parser = Parser.load(args.path)
-        # else:
-        # args.build = True
-        # parser = Parser.build(**args)
         parser.evaluate(**args)
     elif args.mode == 'predict':
         parser = Parser.load(args.path)
