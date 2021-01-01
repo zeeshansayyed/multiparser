@@ -82,8 +82,7 @@ class Field(RawField):
         self.tokenize = tokenize
         self.fn = fn
 
-        self.specials = [token for token in [pad, unk, bos, eos]
-                         if token is not None]
+        self.specials = [token for token in [pad, unk, bos, eos] if token is not None]
 
     def __repr__(self):
         s, params = f"({self.name}): {self.__class__.__name__}(", []
@@ -319,8 +318,8 @@ class SubwordField(Field):
         if self.fix_len <= 0:
             self.fix_len = max(len(token) for seq in sequences for token in seq)
         if self.use_vocab:
-            sequences = [[[self.vocab[i] for i in token] if token else [self.unk_index] for token in seq]
-                         for seq in sequences]
+            sequences = [[[self.vocab[i] if i in self.vocab else self.unk_index for i in token] if token else [self.unk_index]
+                         for token in seq] for seq in sequences]
         if self.bos:
             sequences = [[[self.bos_index]] + seq for seq in sequences]
         if self.eos:
@@ -364,5 +363,9 @@ class ChartField(Field):
         charts = [self.preprocess(chart) for chart in charts]
         if self.use_vocab:
             charts = [[[self.vocab[i] if i is not None else -1 for i in row] for row in chart] for chart in charts]
+        if self.bos:
+            charts = [[[self.bos_index]*len(chart[0])] + chart for chart in charts]
+        if self.eos:
+            charts = [chart + [[self.eos_index]*len(chart[0])] for chart in charts]
         charts = [torch.tensor(chart) for chart in charts]
         return charts

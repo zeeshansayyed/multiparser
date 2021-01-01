@@ -17,8 +17,8 @@ def parse(parser):
     parser.add_argument('--threads', '-t', default=16, type=int, help='max num of threads')
     parser.add_argument('--batch-size', default=5000, type=int, help='batch size')
     parser.add_argument("--local_rank", type=int, default=-1, help='node rank for distributed training')
+    parser.add_argument('--epochs', default=5000, type=int, help='epochs')
     parser.add_argument("--patience", type=int, default=100, help='Patience for early stopping')
-
     args, unknown = parser.parse_known_args()
     args, _ = parser.parse_known_args(unknown, args)
     args = Config(**vars(args))

@@ -5,6 +5,8 @@ from .dependency import (BiaffineDependencyParser, CRF2oDependencyParser,
                          CRFDependencyParser, CRFNPDependencyParser)
 from .multiparsers import MultiBiaffineDependencyParser                 
 from .parser import Parser
+from .semantic_dependency import (BiaffineSemanticDependencyParser,
+                                  VISemanticDependencyParser)
 
 __all__ = ['BiaffineDependencyParser',
            'CRFNPDependencyParser',
@@ -12,4 +14,6 @@ __all__ = ['BiaffineDependencyParser',
            'CRF2oDependencyParser',
            'CRFConstituencyParser',
            'MultiBiaffineDependencyParser',
+           'BiaffineSemanticDependencyParser',
+           'VISemanticDependencyParser',
            'Parser']
