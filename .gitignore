@@ -4,6 +4,9 @@ data
 # Temporary files
 tmp
 
+# Job files
+jobs
+
 # bash scripts
 *.sh
 
@@ -21,6 +24,7 @@ results
 
 # log files
 *.log
+slurm_logs
 
 # pycache
 __pycache__
