@@ -1,6 +1,9 @@
 # data files
 data
 
+# Temporary files
+tmp
+
 # bash scripts
 *.sh
 
