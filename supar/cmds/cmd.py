@@ -19,6 +19,7 @@ def parse(parser):
     parser.add_argument("--local_rank", type=int, default=-1, help='node rank for distributed training')
     parser.add_argument('--epochs', default=5000, type=int, help='epochs')
     parser.add_argument("--patience", type=int, default=100, help='Patience for early stopping')
+    parser.add_argument("-lr", type=float, default=2e-3, help="Learning rate")
     args, unknown = parser.parse_known_args()
     args, _ = parser.parse_known_args(unknown, args)
     args = Config(**vars(args))
@@ -28,7 +29,8 @@ def parse(parser):
     # directory of its own
     # Note: The following part is additional and is not present in original supar
     args.path = Path(args.path)
-    if args.path.is_file():
+
+    if args.path.is_file() or args.path.name.endswith('.model'):
         args.exp_dir = args.path.parent
     else:
         args.exp_dir = args.path

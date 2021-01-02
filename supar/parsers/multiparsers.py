@@ -449,7 +449,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
             )
 
     def _train(self, loader, train_mode='train'):
-        if self.args.joint_loss and self.args.train_mode == 'train':
+        if self.args.joint_loss and train_mode == 'train':
             self._joint_train(loader, train_mode=train_mode)
         else:
             self._separate_train(loader, train_mode=train_mode)
