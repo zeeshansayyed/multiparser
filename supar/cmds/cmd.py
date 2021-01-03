@@ -39,8 +39,9 @@ def parse(parser):
         args.exp_dir.mkdir(parents=True, exist_ok=True)
 
     torch.set_num_threads(args.threads)
-    torch.manual_seed(args.seed)
-    random.seed(args.seed)
+    if args.seed > 0:
+        torch.manual_seed(args.seed)
+        random.seed(args.seed)
     init_device(args.device, args.local_rank)
     if args.mode == 'train':
         ts = time.localtime()
