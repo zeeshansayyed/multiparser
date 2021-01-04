@@ -128,7 +128,7 @@ def _decode(text):
     return text if sys.version_info[0] >= 3 or not isinstance(text, str) else text.decode("utf-8")
 
 def _encode(text):
-    return text if sys.version_info[0] >= 3 or not isinstance(text, unicode) else text.encode("utf-8")
+    return text if sys.version_info[0] >= 3 or not isinstance(text, str) else text.encode("utf-8")
 
 # Load given CoNLL-U file into internal representation
 def load_conllu(file):
