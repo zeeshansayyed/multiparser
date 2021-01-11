@@ -3,9 +3,6 @@ import re
 import argparse
 
 exp_root = Path('exp')
-exp_dir = exp_root / 'arabic' / 'ud-sud' / 'padt-tree-proj-tag-ft'
-result_file = exp_dir / 'results.tab'
-
 task_names = ['ud', 'sud']
 
 def process_eval_line(line):
@@ -66,8 +63,8 @@ def write_dir_results(results, file, split='dev'):
 #         r = read_dir_results(exp)
 #         write_dir_results(r)
 
-def gather(lang, exp_name, file_print=False, debug=False, gather_test=False):
-    exp_dir = exp_root / lang / 'ud-sud' / exp_name
+def gather(lang, exp_type, exp_name, file_print=False, debug=False, gather_test=False):
+    exp_dir = exp_root / lang / exp_type / exp_name
     with open(exp_dir / 'results.txt', 'w') as rfile:
         if file_print:
             print("Dev Results", file=rfile)
@@ -115,6 +112,7 @@ def gather(lang, exp_name, file_print=False, debug=False, gather_test=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Gather experiment results")
     parser.add_argument('--lang', '-l', default='arabic', help="Language")
+    parser.add_argument('--exp-type', '-et', default='ud-sud', help="Type of experiment: (single/ud-sud)")
     parser.add_argument('--exp-name', '-e', required=True, help="Experiment Directory")
     parser.add_argument('--file-print', '-f', action='store_true')
     parser.add_argument('--debug', '-d', action='store_true')
