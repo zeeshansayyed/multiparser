@@ -352,10 +352,11 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         """
         super().__init__(args, model, transforms)
         transform = transforms[0]
-        if self.args.feat in ('char', 'bert'):
-            self.WORD, self.FEAT = transform.FORM
-        else:
-            self.WORD, self.FEAT = transform.FORM, transform.CPOS
+        self.WORD, self.CHAR, self.BERT = transform.FORM
+        # if self.args.feat in ('char', 'bert'): #new
+        #     self.WORD, self.FEAT = transform.FORM
+        # else:
+        #     self.WORD, self.FEAT = transform.FORM, transform.CPOS
         self.ARC, self.REL = transform.HEAD, [t.DEPREL for t in transforms]
         self.puncts = torch.tensor([
             i for s, i in self.WORD.vocab.stoi.items() if ispunct(s)
@@ -377,7 +378,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         self.model.train()
         bar, metric = progress_bar(loader), AttachmentMetric()
 
-        for words, feats, arcs, rels, task_name in bar:
+        for words, *feats, arcs, rels, task_name in bar: #new
             self.optimizer.set_mode(task_name, train_mode)
             self.scheduler.set_mode(task_name, train_mode)
 
@@ -410,7 +411,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         self.optimizer.set_mode(self.args.task_names, train_mode)
         self.scheduler.set_mode(self.args.task_names, train_mode)
         for inputs, targets in bar:
-            words, feats = inputs.values()
+            words, *feats = inputs.values()
             self.optimizer.zero_grad()
             mask = words.ne(self.WORD.pad_index)
             # ignore the first token of each sentence
@@ -462,7 +463,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         if task_name not in self.model.args.task_names:
             return total_loss, metric
 
-        for words, feats, arcs, rels in loader:
+        for words, *feats, arcs, rels in loader:
             mask = words.ne(self.WORD.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
@@ -483,60 +484,6 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
 
         return total_loss, metric
 
-    # @torch.no_grad()
-    # def _old_multi_evaluate(self, loaders):
-    #     """This will evalaute the dataloaders for each task and return a joint
-    #     metric as well as task specific metrics
-
-    #     Args:
-    #         loaders (List[supar.utils.DataLoader]): List of data loaders. Currently
-    #             only simply multitask loaders are supported.
-
-    #     TODO:  Also supported joint loaders. That will save computation time 
-    #             as shared layers will be forwarded only once.
-    #     """
-    #     task_names = self.args.task_names + ['total']
-    #     losses = {tname: 1 for tname in task_names}
-    #     metrics = {tname: AttachmentMetric() for tname in task_names}
-
-    #     for task_name, loader in zip(self.args.task_names, loaders):
-    #         for words, feats, arcs, rels in loader:
-    #             mask = words.ne(self.WORD.pad_index)
-    #             mask[:, 0] = 0
-    #             s_arc, s_rel = self.model(words, feats, task_name)
-    #             loss = self.model.loss(s_arc, s_rel, arcs, rels, mask,
-    #                                    self.args.partial)
-    #             arc_preds, rel_preds = self.model.decode(s_arc, s_rel, mask,
-    #                                                      self.args.tree,
-    #                                                      self.args.proj)
-    #             if self.args.partial:
-    #                 mask &= arcs.ge(0)
-    #             # ignore all punctuation if not specified
-    #             if not self.args.punct:
-    #                 mask &= words.unsqueeze(-1).ne(self.puncts).all(-1)
-    #             # Update losses and metrics
-    #             losses['total'] += loss.item()
-    #             losses[task_name] += loss.item()
-    #             metrics['total'](arc_preds, rel_preds, arcs, rels, mask)
-    #             metrics[task_name](arc_preds, rel_preds, arcs, rels, mask)
-
-    #     return losses, metrics
-
-    # @torch.no_grad()
-    # def _multi_evaluate(self, loaders, task_names):
-    #     losses = {tname: 1 for tname in task_names}
-    #     metrics = {tname: AttachmentMetric() for tname in task_names}
-
-    #     for loader, tname in zip(loaders, task_names):
-    #         losses[tname], metrics[tname] = self._evaluate(loader, tname)
-
-    #     losses['total'] = sum(losses.values())
-    #     total_metric = AttachmentMetric()
-    #     for m in metrics.values():
-    #         total_metric += m
-    #     metrics['total'] = total_metric
-    #     return losses, metrics
-
     @torch.no_grad()
     def _predict(self, loader, task_name):
         # args.task_names was saved in parser while training
@@ -546,7 +493,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
 
         preds = {}
         arcs, rels, probs = [], [], []
-        for words, feats in progress_bar(loader):
+        for words, *feats in progress_bar(loader):
             mask = words.ne(self.WORD.pad_index)
             # ignore the first token of each sentence
             mask[:, 0] = 0
@@ -584,30 +531,46 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
 
         logger.info("Building the fields")
         WORD = Field('words', pad=pad, unk=unk, bos=bos, lower=True)
-        if args.feat == 'char':
-            FEAT = SubwordField('chars', pad=pad, unk=unk, bos=bos,
-                                fix_len=args.fix_len)
-        elif args.feat == 'bert':
+        TAG, CHAR, BERT = None, None, None
+        if 'tag' in args.feat:
+            TAG = Field('tags', bos=bos)
+        if 'char' in args.feat:
+            CHAR = SubwordField('chars', pad=pad, unk=unk, bos=bos, fix_len=args.fix_len)
+        if 'bert' in args.feat:
             from transformers import AutoTokenizer
             tokenizer = AutoTokenizer.from_pretrained(args.bert)
-            FEAT = SubwordField('bert', pad=tokenizer.pad_token,
-                                unk=tokenizer.unk_token, bos=tokenizer.bos_token
-                                or tokenizer.cls_token, fix_len=args.fix_len,
+            BERT = SubwordField('bert',
+                                pad=tokenizer.pad_token,
+                                unk=tokenizer.unk_token,
+                                bos=tokenizer.bos_token or tokenizer.cls_token,
+                                fix_len=args.fix_len,
                                 tokenize=tokenizer.tokenize)
-            FEAT.vocab = tokenizer.get_vocab()
-        else:
-            FEAT = Field('tags', bos=bos)
+            BERT.vocab = tokenizer.get_vocab()
+        # if args.feat == 'char':
+        #     FEAT = SubwordField('chars', pad=pad, unk=unk, bos=bos,
+        #                         fix_len=args.fix_len)
+        # elif args.feat == 'bert':
+        #     from transformers import AutoTokenizer
+        #     tokenizer = AutoTokenizer.from_pretrained(args.bert)
+        #     FEAT = SubwordField('bert', pad=tokenizer.pad_token,
+        #                         unk=tokenizer.unk_token, bos=tokenizer.bos_token
+        #                         or tokenizer.cls_token, fix_len=args.fix_len,
+        #                         tokenize=tokenizer.tokenize)
+        #     FEAT.vocab = tokenizer.get_vocab()
+        # else:
+        #     FEAT = Field('tags', bos=bos)
         ARC = Field('arcs', bos=bos, use_vocab=False, fn=CoNLL.get_arcs)
         RELS = [Field('rels', bos=bos) for i in range(len(args.task_names))]
 
-        if args.feat in ('char', 'bert'):
-            transforms = [
-                CoNLL(FORM=(WORD, FEAT), HEAD=ARC, DEPREL=REL) for REL in RELS
-            ]
-        else:
-            transforms = [
-                CoNLL(FORM=WORD, CPOS=FEAT, HEAD=ARC, DEPREL=REL) for REL in RELS
-            ]
+        transforms = [CoNLL(FORM=(WORD, CHAR, BERT), POS=TAG, HEAD=ARC, DEPREL=REL) for REL in RELS]
+        # if args.feat in ('char', 'bert'):
+        #     transforms = [
+        #         CoNLL(FORM=(WORD, FEAT), HEAD=ARC, DEPREL=REL) for REL in RELS
+        #     ]
+        # else:
+        #     transforms = [
+        #         CoNLL(FORM=WORD, CPOS=FEAT, HEAD=ARC, DEPREL=REL) for REL in RELS
+        #     ]
 
         # HACK for creating a combined train object.
         # TODO: Think of something better. This is UGLY af
@@ -619,9 +582,13 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         for i in range(1, len(train)):
             combined_train.sentences += train[i].sentences
 
-        WORD.build(combined_train, args.min_freq,
+        WORD.build(combined_train, args.min_freq, 
                    (Embedding.load(args.embed, args.unk) if args.embed else None))
-        FEAT.build(combined_train)
+        if TAG is not None:
+            TAG.build(combined_train)
+        if CHAR is not None:
+            CHAR.build(combined_train)
+        # FEAT.build(combined_train)
 
         from collections import Counter
         rel_counters = []
@@ -634,12 +601,16 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
 
         args.update({
             'n_words': WORD.vocab.n_init,
-            'n_feats': len(FEAT.vocab),
+            'n_tags': len(TAG.vocab) if TAG is not None else None,
+            'n_chars': len(CHAR.vocab) if CHAR is not None else None,
+            'char_pad_index': CHAR.pad_index if CHAR is not None else None,
+            'bert_pad_index': BERT.pad_index if BERT is not None else None,
+            # 'n_feats': len(FEAT.vocab),
             'n_rels': [len(REL.vocab) for REL in RELS],
             'pad_index': WORD.pad_index,
             'unk_index': WORD.unk_index,
             'bos_index': WORD.bos_index,
-            'feat_pad_index': FEAT.pad_index,
+            # 'feat_pad_index': FEAT.pad_index,
         })
         model = cls.MODEL(**args)
         model.load_pretrained(WORD.embed).to(args.device)

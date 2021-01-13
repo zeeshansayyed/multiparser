@@ -21,15 +21,19 @@ class MultiBiaffineDependencyModel(nn.Module):
     def __init__(self,
                  task_names,
                  n_words,
-                 n_feats,
+                #  n_feats,
                  n_rels,
-                 feat='char',
+                 n_tags=None,
+                 n_chars=None,
+                 feat='tag,char,bert',
                  n_embed=100,
                  n_feat_embed=100,
                  n_char_embed=50,
+                 char_pad_index=0,
                  bert=None,
                  n_bert_layers=4,
                  mix_dropout=.0,
+                 bert_pad_index=0,
                  embed_dropout=.33,
                  n_lstm_hidden=400,
                  n_lstm_layers=3,
@@ -47,27 +51,46 @@ class MultiBiaffineDependencyModel(nn.Module):
         # the embedding layer
         self.word_embed = nn.Embedding(num_embeddings=n_words,
                                        embedding_dim=n_embed)
-        if feat == 'char':
-            self.feat_embed = CharLSTM(n_chars=n_feats,
+        
+        self.n_input = n_embed
+        if 'tag' in feat:
+            self.tag_embed = nn.Embedding(num_embeddings=n_tags,
+                                          embedding_dim=n_feat_embed)
+            self.n_input += n_feat_embed
+        if 'char' in feat:
+            self.char_embed = CharLSTM(n_chars=n_chars,
                                        n_embed=n_char_embed,
                                        n_out=n_feat_embed,
-                                       pad_index=feat_pad_index)
-        elif feat == 'bert':
-            self.feat_embed = BertEmbedding(model=bert,
+                                       pad_index=char_pad_index)
+            self.n_input += n_feat_embed
+        if 'bert' in feat:
+            self.bert_embed = BertEmbedding(model=bert,
                                             n_layers=n_bert_layers,
                                             n_out=n_feat_embed,
-                                            pad_index=feat_pad_index,
+                                            pad_index=bert_pad_index,
                                             dropout=mix_dropout)
-            self.n_feat_embed = self.feat_embed.n_out
-        elif feat == 'tag':
-            self.feat_embed = nn.Embedding(num_embeddings=n_feats,
-                                           embedding_dim=n_feat_embed)
-        else:
-            raise RuntimeError("The feat type should be in ['char', 'bert', 'tag'].")
+            self.n_input += self.bert_embed.n_out
+        # if feat == 'char':
+        #     self.feat_embed = CharLSTM(n_chars=n_feats,
+        #                                n_embed=n_char_embed,
+        #                                n_out=n_feat_embed,
+        #                                pad_index=feat_pad_index)
+        # elif feat == 'bert':
+        #     self.feat_embed = BertEmbedding(model=bert,
+        #                                     n_layers=n_bert_layers,
+        #                                     n_out=n_feat_embed,
+        #                                     pad_index=feat_pad_index,
+        #                                     dropout=mix_dropout)
+        #     self.n_feat_embed = self.feat_embed.n_out
+        # elif feat == 'tag':
+        #     self.feat_embed = nn.Embedding(num_embeddings=n_feats,
+        #                                    embedding_dim=n_feat_embed)
+        # else:
+        #     raise RuntimeError("The feat type should be in ['char', 'bert', 'tag'].")
         self.embed_dropout = IndependentDropout(p=embed_dropout)
 
         # the lstm layer
-        self.lstm = LSTM(input_size=n_embed+n_feat_embed,
+        self.lstm = LSTM(input_size=self.n_input,     #(input_size=n_embed+n_feat_embed,
                          hidden_size=n_lstm_hidden,
                          num_layers=n_lstm_layers,
                          bidirectional=True,
@@ -140,10 +163,21 @@ class MultiBiaffineDependencyModel(nn.Module):
         word_embed = self.word_embed(ext_words)
         if hasattr(self, 'pretrained'):
             word_embed += self.pretrained(words)
-        feat_embed = self.feat_embed(feats)
-        word_embed, feat_embed = self.embed_dropout(word_embed, feat_embed)
+            
+        feat_embeds = []
+        if 'tag' in self.args.feat:
+            feat_embeds.append(self.tag_embed(feats.pop()))
+        if 'char' in self.args.feat:
+            feat_embeds.append(self.char_embed(feats.pop(0)))
+        if 'bert' in self.args.feat:
+            feat_embeds.append(self.bert_embed(feats.pop(0)))
+        word_embed, feat_embed = self.embed_dropout(word_embed, torch.cat(feat_embeds, -1))
         # concatenate the word and feat representations
         embed = torch.cat((word_embed, feat_embed), -1)
+        # feat_embed = self.feat_embed(feats)
+        # word_embed, feat_embed = self.embed_dropout(word_embed, feat_embed)
+        # # concatenate the word and feat representations
+        # embed = torch.cat((word_embed, feat_embed), -1)
 
         x = pack_padded_sequence(embed, mask.sum(1), True, False)
         x, _ = self.lstm(x)
