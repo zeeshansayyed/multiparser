@@ -41,7 +41,7 @@ class MultiBiaffineDependencyModel(nn.Module):
                  n_mlp_arc=500,
                  n_mlp_rel=100,
                  mlp_dropout=.33,
-                 feat_pad_index=0,
+                #  feat_pad_index=0,
                  pad_index=0,
                  unk_index=1,
                  **kwargs):
