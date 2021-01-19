@@ -46,11 +46,10 @@ def parse(parser):
     if args.mode == 'train':
         ts = time.localtime()
         ts = time.strftime("%Y-%m-%d--%H:%M:%S", ts)
-        if args.train_mode == 'finetune':
+        if Parser.NAME == 'multi-biaffine-dependency' and args.train_mode == 'finetune':
             init_logger(logger, args.exp_dir / f"finetune-{ts}.log")
         else:
             init_logger(logger, args.exp_dir / f"{args.mode}-{ts}.log")
-
     else:
         init_logger(logger, args.exp_dir / f"{args.mode}.log")
     logger.info('\n' + str(args))
