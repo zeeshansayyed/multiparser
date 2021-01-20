@@ -20,14 +20,8 @@ def process_eval_line(line, baseline=False):
         model = 'base'
     else:
         model = re.search(r"Model=(.*?)\.model", line).group(1)
-        model = '-'.join(model.split('-')[-2:])
-    # uas_regex = re.search(r"UAS:(.*?)%", line)
-    # UAS, LAS = None, None
-    # if uas_regex:
-    #     UAS = uas_regex.group(1)
-    # las_regex = re.search(r"LAS:(.*?)%", line)
-    # if las_regex:
-    #     LAS = uas_regex.group(1)
+        # model = '-'.join(model.split('-')[-2:])
+
     UAS = re.search(r"UAS:(.*?)%", line).group(1)
     LAS = re.search(r"LAS:(.*?)%", line).group(1)
     return data_type, model, (UAS, LAS)
@@ -53,6 +47,7 @@ def read_results(exp, baseline=False):
 
 def write_result(results, tasks=['ud', 'sud'], splits=['dev'], finetune=False, file=None, debug=False):
     """Write the results of an exp_dir in either one line (regular) or multiple lines (finetuning)"""
+
     ret_res = []
     if isinstance(splits, str):
         splits = list(splits)
@@ -68,12 +63,13 @@ def write_result(results, tasks=['ud', 'sud'], splits=['dev'], finetune=False, f
             print(' & '.join(line), file=file)
         ret_res.append(line)
         if finetune:
+            assert finetune in ['partial', 'whole']
             for from_task in tasks + ['total']:
                 line = []
                 if debug:
                     print(f"{from_task + ':':<20}", end='', file=file)
                 for to_task in tasks:
-                    line += [score.strip() for score in curr_res[f"{from_task}-{to_task}"]]
+                    line += [score.strip() for score in curr_res[f"{finetune}-{from_task}-{to_task}"]]
                 if debug:
                     print(' & '.join(line), file=file)
                 ret_res.append(line)
@@ -189,11 +185,11 @@ def gather_baseline_dir(exp_dir, baseline=False, debug=False, std_dev=False):
     # print(sub_exp_results_mean)
     # print(sub_exp_results_std)
 
-def gather_multitask(lang, exp_type, exp_name, debug=False, file_print=False, gather_test=False, std_dev=False):
+def gather_multitask(lang, exp_type, exp_name, losses, debug=False, finetune=False, gather_test=False, std_dev=False):
 
     exp_dir = exp_root / lang / exp_type / exp_name
     
-    for loss in ['alternating', 'joint']:
+    for loss in losses:
         for mlp in ['nosharemlp', 'sharemlp']:
             sub_exp = exp_dir / f'{loss}-{mlp}'
             sub_exp_results = []
@@ -202,18 +198,22 @@ def gather_multitask(lang, exp_type, exp_name, debug=False, file_print=False, ga
                     if debug:
                         print(run)
                     run_results = read_results(run)
-                    run_results = write_result(run_results, debug=debug)
+                    run_results = write_result(run_results, finetune=finetune, debug=debug)
                     run_results = np.array(run_results, dtype=float)
                     sub_exp_results.append(run_results)
 
             sub_exp_results = np.stack(sub_exp_results, axis=2)
-            means = [f"{i:.2f}" for i in np.mean(sub_exp_results, axis=2).tolist()[0]]
-            stds = [f"{i:.2f}" for i in np.std(sub_exp_results, axis=2).tolist()[0]]
+            all_means = [[f"{i:.2f}" for i in row] for row in np.mean(sub_exp_results, axis=2).tolist()]
+            all_stds = [[f"{i:.2f}" for i in row] for row in np.std(sub_exp_results, axis=2).tolist()]
+            # all_means = [f"{i:.2f}" for i in np.mean(sub_exp_results, axis=2).tolist()[0]]
+            # all_stds = [f"{i:.2f}" for i in np.std(sub_exp_results, axis=2).tolist()[0]]
             if not std_dev:
-                print(' & '.join(means))
+                for means in all_means:
+                    print(' & '.join(means))
             else:
-                means_stds = [f"{m} ({s})" for m, s in zip(means, stds)]
-                print(' & '.join(means_stds))
+                for means, stds in zip(all_means, all_stds):
+                    means_stds = [f"{m} ({s})" for m, s in zip(means, stds)]
+                    print(' & '.join(means_stds))
             # sub_exp_results_mean = ' & '.join([f"{i:.2f}" for i in np.mean(sub_exp_results, axis=2).tolist()[0]])
             # sub_exp_results_std = ' & '.join([f"{i:.2f}" for i in np.std(sub_exp_results, axis=2).tolist()[0]])
             # print(sub_exp_results_mean)
@@ -226,14 +226,15 @@ if __name__ == "__main__":
                         help="Type of experiment: (single/ud-sud)")
     parser.add_argument('--exp-name', '-en', required=True,
                         help="Experiment Directory")
-    parser.add_argument('--file-print', '-f', action='store_true')
+    parser.add_argument('--finetune', '-f', default=None, choices=['partial', 'whole'])
     parser.add_argument('--debug', '-d', action='store_true')
     parser.add_argument('--gather-test', '-t', action='store_true')
     parser.add_argument('--baseline', '-b', action='store_true')
     parser.add_argument('--std-dev', '-s', action='store_true')
+    parser.add_argument('--losses', nargs='+', default=['alternating', 'joint'])
     args = parser.parse_args()
     if args.baseline:
         gather_baseline_dir(exp_root / args.lang / 'baseline' / args.exp_name, baseline=args.baseline, debug=args.debug, std_dev=args.std_dev)
     else:
         # args = vars(args)
-        gather_multitask(args.lang, args.exp_type, args.exp_name, args.debug, args.file_print, args.gather_test, std_dev=args.std_dev)
+        gather_multitask(args.lang, args.exp_type, args.exp_name, args.losses, args.debug, args.finetune, args.gather_test, std_dev=args.std_dev)
