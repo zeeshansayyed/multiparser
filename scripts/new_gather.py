@@ -63,16 +63,26 @@ def write_result(results, tasks=['ud', 'sud'], splits=['dev'], finetune=False, f
             print(' & '.join(line), file=file)
         ret_res.append(line)
         if finetune:
-            assert finetune in ['partial', 'whole']
-            for from_task in tasks + ['total']:
-                line = []
+            if finetune == 'standard':
+                ftype = 'whole'
                 if debug:
-                    print(f"{from_task + ':':<20}", end='', file=file)
-                for to_task in tasks:
-                    line += [score.strip() for score in curr_res[f"{finetune}-{from_task}-{to_task}"]]
+                    print(f"standard{':':<20}", end='', file=file)
+                for task in tasks:
+                    line = []
+                    line += [score.strip() for score in curr_res[f"{ftype}-{task}-{task}"]]
                 if debug:
                     print(' & '.join(line), file=file)
                 ret_res.append(line)
+            else:
+                for from_task in tasks + ['total']:
+                    line = []
+                    if debug:
+                        print(f"{from_task + ':':<20}", end='', file=file)
+                    for to_task in tasks:
+                        line += [score.strip() for score in curr_res[f"{finetune}-{from_task}-{to_task}"]]
+                    if debug:
+                        print(' & '.join(line), file=file)
+                    ret_res.append(line)
     return ret_res
 
 def write_baseline_result(results, debug=False):
@@ -104,63 +114,61 @@ def write_all_results(base_dir, tasks=['ud', 'sud'], finetune=False, gather_test
 
 
 
-def collate_multiple_runs(lang, exp_type, exp_name, exp_sub_name):
-    exp_dir = exp_root / lang / exp_type / exp_name / exp_sub_name
-    write_all_results(exp_dir, gather_test=True)
-    results = exp_dir / 'results.txt'
-    with results.open('w') as results:
-        for sub_dir in exp_dir.glob('*'):
-            if sub_dir.is_dir():
-                sub_res = sub_dir / 'results.txt'
-                print(sub_dir.name, file=results)
-                with sub_res.open('r') as sub_res:
-                    for line in sub_res:
-                        print(line.strip(), file=results)
+# def collate_multiple_runs(lang, exp_type, exp_name, exp_sub_name):
+#     exp_dir = exp_root / lang / exp_type / exp_name / exp_sub_name
+#     write_all_results(exp_dir, gather_test=True)
+#     results = exp_dir / 'results.txt'
+#     with results.open('w') as results:
+#         for sub_dir in exp_dir.glob('*'):
+#             if sub_dir.is_dir():
+#                 sub_res = sub_dir / 'results.txt'
+#                 print(sub_dir.name, file=results)
+#                 with sub_res.open('r') as sub_res:
+#                     for line in sub_res:
+#                         print(line.strip(), file=results)
 
-    all_results = defaultdict(list)
-    results = exp_dir / 'results.txt'
-    with results.open('r') as results:
-        for line in results:
-            if ':' in line:
-                key, values = line.split(':')
-                key = key.strip()
-                values = values.strip().split(' & ')
-                values = [float(val) for val in values]
-                all_results[key].append(values)
+#     all_results = defaultdict(list)
+#     results = exp_dir / 'results.txt'
+#     with results.open('r') as results:
+#         for line in results:
+#             if ':' in line:
+#                 key, values = line.split(':')
+#                 key = key.strip()
+#                 values = values.strip().split(' & ')
+#                 values = [float(val) for val in values]
+#                 all_results[key].append(values)
 
-    # for key in all_results:
-    #     all_results[key] = list(np.array(all_results[key]).mean(axis=0))
+#     # for key in all_results:
+#     #     all_results[key] = list(np.array(all_results[key]).mean(axis=0))
 
-    results = exp_dir / 'results.txt'
-    with results.open('a') as results:
-        print("Mean of Results", file=results)
-        for k, v in all_results.items():
-            v = list(np.array(v).mean(axis=0))
-            v = [f"{i:.2f}" for i in v]
-            print(f"{k + ':':<20}{' & '.join(v)}", file=results)
-        print("Std Dev Results", file=results)
-        for k, v in all_results.items():
-            v = list(np.array(v).std(axis=0))
-            v = [f"{i:.2f}" for i in v]
-            print(f"{k + ':':<20}{' & '.join(v)}", file=results)
+#     results = exp_dir / 'results.txt'
+#     with results.open('a') as results:
+#         print("Mean of Results", file=results)
+#         for k, v in all_results.items():
+#             v = list(np.array(v).mean(axis=0))
+#             v = [f"{i:.2f}" for i in v]
+#             print(f"{k + ':':<20}{' & '.join(v)}", file=results)
+#         print("Std Dev Results", file=results)
+#         for k, v in all_results.items():
+#             v = list(np.array(v).std(axis=0))
+#             v = [f"{i:.2f}" for i in v]
+#             print(f"{k + ':':<20}{' & '.join(v)}", file=results)
 
-lang = 'arabic'
-exp_type = 'ud-sud'
-exp_name = 'padt-tag'
 
-# for exp_name in ['padt-tag', 'padt-tag-ft', 'padt-char', 'padt-char-ft', 'padt-tag-char', 'padt-tag-char-ft']:
-#     print(exp_name)
-#     exp_dir = exp_root / lang / exp_type / exp_name
-#     for sub_dir in exp_dir.glob('*'):
-#         if sub_dir.is_dir():
-#             collate_multiple_runs(lang, exp_type, exp_name, sub_dir.name)
 
-def gather_baseline_dir(exp_dir, baseline=False, debug=False, std_dev=False):
+def gather_baseline_dir(exp_dir, seeds, baseline=False, debug=False, std_dev=False):
+    if len(seeds) == 0:
+        all_seeds = True
+        print("No seeds provided, will average all seeds present")
+    else:
+        all_seeds = False
+        print(f"Will averate seeds {' '.join(seeds)}")
+
     if debug:
         print(exp_dir)
     exp_results = []
     for run in exp_dir.glob('*'):
-        if run.is_dir():
+        if run.is_dir() and (run.name in seeds or all_seeds):
             if debug:
                 print(run)
             run_results = read_results(run, baseline=baseline)
@@ -185,16 +193,22 @@ def gather_baseline_dir(exp_dir, baseline=False, debug=False, std_dev=False):
     # print(sub_exp_results_mean)
     # print(sub_exp_results_std)
 
-def gather_multitask(lang, exp_type, exp_name, losses, debug=False, finetune=False, gather_test=False, std_dev=False):
+def gather_multitask(lang, exp_type, exp_name, losses, seeds, debug=False, finetune=False, gather_test=False, std_dev=False):
 
     exp_dir = exp_root / lang / exp_type / exp_name
+    if len(seeds) == 0:
+        all_seeds = True
+        print("No seeds provided, will average all seeds present")
+    else:
+        all_seeds = False
+        print(f"Will averate seeds {' '.join(seeds)}")
     
     for loss in losses:
         for mlp in ['nosharemlp', 'sharemlp']:
             sub_exp = exp_dir / f'{loss}-{mlp}'
             sub_exp_results = []
             for run in sub_exp.glob('*'):
-                if run.is_dir():
+                if run.is_dir() and (run.name in seeds or all_seeds):
                     if debug:
                         print(run)
                     run_results = read_results(run)
@@ -226,15 +240,15 @@ if __name__ == "__main__":
                         help="Type of experiment: (single/ud-sud)")
     parser.add_argument('--exp-name', '-en', required=True,
                         help="Experiment Directory")
-    parser.add_argument('--finetune', '-f', default=None, choices=['partial', 'whole'])
+    parser.add_argument('--finetune', '-f', default=None, choices=['partial', 'whole', 'standard'])
     parser.add_argument('--debug', '-d', action='store_true')
     parser.add_argument('--gather-test', '-t', action='store_true')
     parser.add_argument('--baseline', '-b', action='store_true')
     parser.add_argument('--std-dev', '-s', action='store_true')
     parser.add_argument('--losses', nargs='+', default=['alternating', 'joint'])
+    parser.add_argument('--seeds', nargs='+', default=[], help="Which seeds to gather from?")
     args = parser.parse_args()
     if args.baseline:
-        gather_baseline_dir(exp_root / args.lang / 'baseline' / args.exp_name, baseline=args.baseline, debug=args.debug, std_dev=args.std_dev)
+        gather_baseline_dir(exp_root / args.lang / 'baseline' / args.exp_name, args.seeds, baseline=args.baseline, debug=args.debug, std_dev=args.std_dev)
     else:
-        # args = vars(args)
-        gather_multitask(args.lang, args.exp_type, args.exp_name, args.losses, args.debug, args.finetune, args.gather_test, std_dev=args.std_dev)
+        gather_multitask(args.lang, args.exp_type, args.exp_name, args.losses, args.seeds, args.debug, args.finetune, args.gather_test, std_dev=args.std_dev)
