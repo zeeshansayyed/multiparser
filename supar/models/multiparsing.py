@@ -171,14 +171,15 @@ class MultiBiaffineDependencyModel(nn.Module):
             feat_embeds.append(self.char_embed(feats.pop(0)))
         if 'bert' in self.args.feat:
             feat_embeds.append(self.bert_embed(feats.pop(0)))
-        word_embed, feat_embed = self.embed_dropout(word_embed, torch.cat(feat_embeds, -1))
-        # concatenate the word and feat representations
-        embed = torch.cat((word_embed, feat_embed), -1)
-        # feat_embed = self.feat_embed(feats)
-        # word_embed, feat_embed = self.embed_dropout(word_embed, feat_embed)
-        # # concatenate the word and feat representations
-        # embed = torch.cat((word_embed, feat_embed), -1)
 
+        if len(feat_embeds) > 0:
+            word_embed, feat_embed = self.embed_dropout(word_embed, torch.cat(feat_embeds, -1))
+            # concatenate the word and feat representations
+            embed = torch.cat((word_embed, feat_embed), -1)
+        else:
+            word_embed = self.embed_dropout(word_embed)
+            embed = torch.cat((word_embed), -1)
+        
         x = pack_padded_sequence(embed, mask.sum(1), True, False)
         x, _ = self.lstm(x)
         x, _ = pad_packed_sequence(x, True, total_length=seq_len)
