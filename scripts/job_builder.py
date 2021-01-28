@@ -190,7 +190,7 @@ def build_baseline_cmd(cmd_type, lang_name, lang_code, tasks, task_data, feats, 
 
 def build(lang_name, lang_code, treebank, tasks, features, use_fasttext, seeds,
           additional_tasks, additional_train, additional_dev, additional_test,
-          embed_extension, losses, mlps, jobs):
+          embed_extension, losses, mlps, jobs, verbose):
     if lang_name == 'hungarian':
         treebank = treebank.title()
     else:
@@ -227,52 +227,70 @@ def build(lang_name, lang_code, treebank, tasks, features, use_fasttext, seeds,
         embed_extension = treebank.lower()
 
     # Multitask Train
-    if 'mt' in jobs:
-        for feats in features:
-            for fastText in all_fasttext:
-                print(f"\n# Train jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
-                build_cmd('train', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds, losses, mlps)
+    def mt():
+        if 'mt' in jobs:
+            for feats in features:
+                for fastText in all_fasttext:
+                    if verbose:
+                        print(f"\n# Multitask Train jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
+                    build_cmd('train', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds, losses, mlps)
 
     # Baseline Train
-    if 'bt' in jobs:
-        for feats in features:
-            for fastText in all_fasttext:
-                print(f"\n# Baseline Train jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
-                build_baseline_cmd('train', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds)
+    def bt():
+        if 'bt' in jobs:
+            for feats in features:
+                for fastText in all_fasttext:
+                    if verbose:
+                        print(f"\n# Baseline Train jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
+                    build_baseline_cmd('train', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds)
 
     # Multitask Evaluate
-    if 'me' in jobs:
-        for feats in features:
-            for fastText in all_fasttext:
-                print(f"\nEvaluate jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
-                build_cmd('evaluate', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds, losses, mlps)
+    def me():
+        if 'me' in jobs:
+            for feats in features:
+                for fastText in all_fasttext:
+                    if verbose:
+                        print(f"\nMultitask Evaluate jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
+                    build_cmd('evaluate', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds, losses, mlps)
 
     #Multitask predict
-    if 'mp' in jobs:
-        for feats in features:
-            for fastText in all_fasttext:
-                print(f"\nPredict jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
-                build_cmd('predict', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds, losses, mlps)
+    def mp():
+        if 'mp' in jobs:
+            for feats in features:
+                for fastText in all_fasttext:
+                    if verbose:
+                        print(f"\nMultitask Predict jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
+                    build_cmd('predict', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds, losses, mlps)
 
     # Baseline Evaluate
-    if 'be' in jobs:
-        for feats in features:
-            for fastText in all_fasttext:
-                print(f"\nBaseline Evaluate jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
-                build_baseline_cmd('evaluate', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds)
+    def be():
+        if 'be' in jobs:
+            for feats in features:
+                for fastText in all_fasttext:
+                    if verbose:
+                        print(f"\nBaseline Evaluate jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
+                    build_baseline_cmd('evaluate', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds)
 
     # Baseline Predict
-    if 'bp' in jobs:
-        for feats in features:
-            for fastText in all_fasttext:
-                print(f"\nBaseline Predict jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
-                build_baseline_cmd('predict', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds)
+    def bp():
+        if 'bp' in jobs:
+            for feats in features:
+                for fastText in all_fasttext:
+                    if verbose:
+                        print(f"\nBaseline Predict jobs for {feats} and fastText = {fastText} and tasks {'-'.join(tasks)} and lang={lang_name}")
+                    build_baseline_cmd('predict', lang_name, lang_code, tasks, task_data, feats, fastText, embed_extension, seeds)
+
+    job_commands = {
+        'mt': mt, 'bt': bt, 'me': me, 'mp': mp, 'be': be, 'bp': bp
+    }
+    for job in jobs:
+        job_commands[job]()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Shrink Fasttext embeddings")
     parser.add_argument('--lang-name', '-ln', required=True, help="Language Name")
-    parser.add_argument('--lang-code', '-lc', required=True, help="Language Code")
+    parser.add_argument('--lang-code', '-lc', required=True,  help="Language Code")
     parser.add_argument('--treebank', '-t', required=True, help="Name of the treebank")
     parser.add_argument('--tasks', nargs='+', default=['ud', 'sud'])
     parser.add_argument('--features', '-f', nargs='+', help="Random seeds to be used")
@@ -286,6 +304,7 @@ if __name__ == "__main__":
     parser.add_argument('--additional-test', nargs='+', help='paths to additional test files')
     parser.add_argument('--embed-extension', default=None, help="Extension of FastText embeddings")
     parser.add_argument('--jobs', nargs='+', default=['mt', 'me', 'mp', 'bt', 'be', 'bp'], help="Which jobs to build")
+    parser.add_argument('--verbose', '-v', default=False, action='store_true')
     args = parser.parse_args()
     args = vars(args)
     build(**args)
