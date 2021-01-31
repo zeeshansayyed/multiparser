@@ -253,22 +253,23 @@ class MultiTaskParser(Parser):
                 paths += list(args.path.glob(f'{task}.model'))
 
             for data in data_list:
-                logger.info("Loading the data")
-                dataset = Dataset(transform, data)
-                dataset.build(args.batch_size, args.buckets)
-                logger.info(f"\n{dataset}")
                 for path in paths:
+                    logger.info("Loading the data")
+                    dataset = Dataset(transform, data)
+                    dataset.build(args.batch_size, args.buckets)
+                    logger.info(f"\n{dataset}")
+                    args.path = path
                     parser = self.load(path)
                     print(path)
                     logger.info(f"Making predictions on {data} using {path.name}")
                     start = datetime.now()
-                    preds = self._predict(dataset.loader, task)
+                    preds = parser._predict(dataset.loader, task)
                     elapsed = datetime.now() - start
 
                     for name, value in preds.items():
                         setattr(dataset, name, value)
                     if is_master():
-                        if args.pred is None:
+                        if not hasattr(args, 'pred') or args.pred is None:
                             pred = args.exp_dir / f"{path.stem}-{os.path.split(data)[-1]}"
                         logger.info(f"Saving predicted results to {pred}")
                         transform.save(pred, dataset.sentences)
@@ -504,7 +505,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
                                                      self.args.proj)
             arcs.extend(arc_preds[mask].split(lens))
             rels.extend(rel_preds[mask].split(lens))
-            if self.args.prob:
+            if hasattr(self.args, 'pred') and self.args.prob:
                 arc_probs = s_arc.softmax(-1)
                 probs.extend([
                     prob[1:i + 1, :i + 1].cpu()
@@ -513,7 +514,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         arcs = [seq.tolist() for seq in arcs]
         rels = [self.REL[task_id].vocab[seq.tolist()] for seq in rels]
         preds = {'arcs': arcs, 'rels': rels}
-        if self.args.prob:
+        if hasattr(self.args, 'pred') and self.args.prob:
             preds['probs'] = probs
 
         return preds
