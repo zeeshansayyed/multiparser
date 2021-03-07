@@ -719,3 +719,26 @@ class TreeSentence(Sentence):
 
     def __repr__(self):
         return self.values[-2].pformat(1000000)
+
+
+class StdSeg(CoNLL):
+
+    fields = ['ID', 'RAW', 'SEG', 'SEGL', 'STD', 'STDCSEG', 'STDCSEGL']
+
+    def __init__(self, ID=None, RAW=None, SEG=None, SEGL=None, STD=None, STDCSEG=None, STDCSEGL=None):
+        super().__init__()
+        self.ID = ID
+        self.RAW = RAW
+        self.SEG = SEG
+        self.SEGL = SEGL
+        self.STD = STD
+        self.STDCSEG = STDCSEG
+        self.STDCSEGL = STDCSEGL
+
+    @property
+    def src(self):
+        return (self.RAW,)
+
+    @property
+    def tgt(self):
+        return self.SEG, self.SEGL, self.STD, self.STDCSEG, self.STDCSEGL

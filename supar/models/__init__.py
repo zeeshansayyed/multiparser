@@ -6,6 +6,7 @@ from .dependency import (BiaffineDependencyModel, CRF2oDependencyModel,
 from .multiparsing import MultiBiaffineDependencyModel
 from .semantic_dependency import (BiaffineSemanticDependencyModel,
                                   VISemanticDependencyModel)
+from .segmentation import SegmenterModel
 
 __all__ = ['BiaffineDependencyModel',
            'CRFNPDependencyModel',
@@ -14,4 +15,5 @@ __all__ = ['BiaffineDependencyModel',
            'CRFConstituencyModel',
            'MultiBiaffineDependencyModel'
            'BiaffineSemanticDependencyModel',
-           'VISemanticDependencyModel']
+           'VISemanticDependencyModel',
+           'SegmenterModel']

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from collections import Counter
-
+import torch
 
 class Metric(object):
 
@@ -213,3 +213,72 @@ class ChartMetric(Metric):
     @property
     def f(self):
         return 2 * self.tp / (self.pred + self.gold + self.eps)
+
+import pudb
+class SegmentationMetric(Metric):
+
+    def __init__(self, eps=1e-12, space_index=3, compute_word_acc=False) -> None:
+        super().__init__()
+        self.eps = eps
+        self.n = 0.0
+        self.correct_words = 0.0
+        self.correct_chars = 0.0
+        self.total_words = 0.0
+        self.total_chars = 0.0
+        self.space_index = space_index
+        self.compute_word_acc = compute_word_acc
+
+    def __repr__(self) -> str:
+        if self.compute_word_acc:
+            s = f"WordAcc: {self.word_acc:4.2%} CharAcc: {self.char_acc:4.2%} "
+        else:
+            s = f"CharAcc: {self.char_acc:4.2%} "
+        return s
+
+    def __call__(self, pred_labels, gold_labels, word_mask, char_mask):
+        self.total_chars += char_mask.sum()
+        res = pred_labels.eq(gold_labels)[char_mask]
+        self.correct_chars += res.sum()
+        if self.compute_word_acc:
+            lens = char_mask.sum(-1).tolist()
+            gold_list = [map(str, seq.tolist()) for seq in gold_labels[char_mask].split(lens)]
+            pred_list = [map(str, seq.tolist()) for seq in pred_labels[char_mask].split(lens)]
+            gold_labels = [''.join(gword).split(str(self.space_index)) for gword in gold_list]
+            pred_labels = [''.join(pword).split(str(self.space_index)) for pword in pred_list]
+            assert len(gold_labels) == len(pred_labels)
+            for gsent, psent in zip(gold_labels, pred_labels):
+                # assert len(gsent) == len(psent)
+                self.total_words += len(gsent)
+                for gword, pword in zip(gsent, psent):
+                    if gword == pword:
+                        self.correct_words += 1
+            # lens = char_mask.sum(-1).tolist()
+            # gold_sents = gold_labels[char_mask].split(lens)
+            # pred_sents = pred_labels[char_mask].split(lens)
+            # for gold_sent, pred_sent in zip(gold_sents, pred_sents):
+            #     space_mask = torch.nonzero(gold_sent.eq(self.space_index),
+            #                                as_tuple=False).view(-1)
+            #     shifted_space_mask = space_mask.roll(1)
+            #     shifted_space_mask[0] = 0
+            #     word_lens = (space_mask - shifted_space_mask).tolist()
+            #     word_lens[0] += 1
+            #     word_lens.append(len(gold_sent) - sum(word_lens))
+            #     gold_words = gold_sent.split(word_lens)
+            #     pred_words = pred_sent.split(word_lens)
+            #     self.total_words += len(gold_words)
+            #     for gold_word, pred_word in zip(gold_words, pred_words):
+            #         if gold_word.eq(pred_word).sum() == len(gold_word):
+            #             self.correct_words += 1
+        return self
+
+    @property
+    def score(self):
+        return self.char_acc
+
+    @property
+    def word_acc(self):
+        return self.correct_words / (self.total_words + self.eps)
+
+    @property
+    def char_acc(self):
+        return self.correct_chars / (self.total_chars + self.eps)

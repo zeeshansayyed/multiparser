@@ -7,6 +7,7 @@ from .multiparsers import MultiBiaffineDependencyParser
 from .parser import Parser
 from .semantic_dependency import (BiaffineSemanticDependencyParser,
                                   VISemanticDependencyParser)
+from .segmentation import Segmenter
 
 __all__ = ['BiaffineDependencyParser',
            'CRFNPDependencyParser',
@@ -16,4 +17,5 @@ __all__ = ['BiaffineDependencyParser',
            'MultiBiaffineDependencyParser',
            'BiaffineSemanticDependencyParser',
            'VISemanticDependencyParser',
+           'Segmenter'
            'Parser']
