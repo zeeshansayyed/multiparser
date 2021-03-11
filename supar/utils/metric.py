@@ -2,6 +2,7 @@
 
 from collections import Counter
 import torch
+from numba import jit
 
 class Metric(object):
 
@@ -236,6 +237,7 @@ class SegmentationMetric(Metric):
         return s
 
     def __call__(self, pred_labels, gold_labels, word_mask, char_mask):
+        pu.db
         self.total_chars += char_mask.sum()
         res = pred_labels.eq(gold_labels)[char_mask]
         self.correct_chars += res.sum()
@@ -274,6 +276,75 @@ class SegmentationMetric(Metric):
     @property
     def score(self):
         return self.char_acc
+
+    @property
+    def word_acc(self):
+        return self.correct_words / (self.total_words + self.eps)
+
+    @property
+    def char_acc(self):
+        return self.correct_chars / (self.total_chars + self.eps)
+
+
+def split_list(input_list, split_id, stop_id):
+    end_idx = len(input_list)
+    idx_list = []
+    for idx, val in enumerate(input_list):
+        if val == split_id:
+            idx_list.append(idx + 1)
+        elif val == stop_id:
+            end_idx = idx
+            break
+    from_idx = [0] + idx_list
+    to_idx = idx_list + [end_idx]
+    res = [input_list[i:j] for i, j in zip(from_idx, to_idx)]
+    # idx_list = [idx + 1 for idx, val in enumerate(test_list) if val == split_id]
+    # res = [
+    #     input_list[i:j] for i, j in zip([0] + idx_list, idx_list +
+    #                                     ([end_idx] if idx_list[-1] != end_idx else []))
+    # ]
+    return res
+
+
+class StandardizationMetric(Metric):
+
+    def __init__(self, eps=1e-12, space_idx=3, pad_idx=0, compute_word_acc=False) -> None:
+        super().__init__()
+        self.eps = eps
+        self.n = 0.0
+        self.correct_words = 0.0
+        self.correct_chars = 0.0
+        self.total_words = 0.0
+        self.total_chars = 0.0
+        self.space_idx = space_idx
+        self.pad_idx = pad_idx
+        self.compute_word_acc = compute_word_acc
+
+    def __repr__(self) -> str:
+        if self.compute_word_acc:
+            s = f"WordAcc: {self.word_acc:4.2%} CharAcc: {self.char_acc:4.2%} "
+        else:
+            s = f"CharAcc: {self.char_acc:4.2%} "
+        return s
+
+    def __call__(self, pred_labels, gold_labels, word_mask, char_mask):
+        gold_labels = gold_labels.tolist()
+
+        if self.compute_word_acc:
+            for pred_s, gold_s in zip(pred_labels, gold_labels):
+                pred_words = split_list(pred_s, self.space_idx, self.pad_idx)
+                gold_words = split_list(gold_s[1:], self.space_idx, self.pad_idx)
+                self.total_words += len(gold_words)
+                for i, gold_word in enumerate(gold_words):
+                    if i < len(pred_words):
+                        if gold_word == pred_words[i]:
+                            self.correct_words += 1
+
+        return self
+
+    @property
+    def score(self):
+        return self.word_acc
 
     @property
     def word_acc(self):

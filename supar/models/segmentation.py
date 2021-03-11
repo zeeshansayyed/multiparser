@@ -7,6 +7,7 @@ from fairseq.sequence_generator import SequenceGenerator
 from torch._C import BenchmarkConfig
 from supar.modules import LSTM, MLP
 from supar.utils import Config
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
@@ -105,51 +106,7 @@ class SegmenterModel(nn.Module):
         return scores.argmax(-1)
 
 
-
 class StandardizerModel(nn.Module):
-    def __init__(self, source_dict, target_dict, n_embed=100, n_lstm_hidden=400,
-                 n_lstm_layers=3, embed_dropout=.33, lstm_dropout=.33,
-                 top_dropout=.33, pad_index=0, unk_index=1, device='cpu', **kwargs):
-        super().__init__()
-        self.args = Config().update(locals())
-        self.src_dict = source_dict
-        self.tgt_dict = target_dict
-        encoder = EncoderRNN(n_embed, n_lstm_hidden, n_lstm_hidden, len(source_dict), device)
-        attn = Attention(n_lstm_hidden, n_lstm_hidden)
-        decoder = AttnDecoderRNN(n_embed, n_lstm_hidden, n_lstm_hidden, len(target_dict), attn, device)
-        self.seq2seq = Seq2Seq(encoder, decoder, device)
-        self.criterion = nn.CrossEntropyLoss(ignore_index=target_dict.pad())
-
-    def load_pretrained(self, embed=None):
-        if embed is not None:
-            self.pretrained = nn.Embedding.from_pretrained(embed)
-            nn.init.zeros_(self.word_embed.weight)
-        return self
-
-    def forward(self, src_chars, tgt_chars):
-        return self.seq2seq(src_chars.T, tgt_chars.T)
-
-    def loss(self, output, target_chars):
-        output_size = output.shape[-1]
-        output = output[1:].view(-1, output_size)
-        # target_chars = target_chars[1:].view(-1)
-        target_chars = target_chars.T[1:].reshape(-1)
-        return self.criterion(output, target_chars)
-
-    def decode(self):
-        decoded_seqs = batch_beam_search_decoding(decoder=model.decoder,
-                                                      enc_outs=enc_outs,
-                                                      enc_last_h=h,
-                                                      beam_width=opts.beam_width,
-                                                      n_best=opts.n_best,
-                                                      sos_token=TRG_SOS_IDX,
-                                                      eos_token=TRG_EOS_IDX,
-                                                      max_dec_steps=opts.max_dec_steps,
-                                                      device=DEVICE)
-
-
-
-class StandardizerModel2(nn.Module):
     def __init__(self, source_dict, target_dict, n_embed=100, n_lstm_hidden=400,
                  n_lstm_layers=3, embed_dropout=.33, lstm_dropout=.33,
                  top_dropout=.33, pad_index=0, unk_index=1, **kwargs):
@@ -206,24 +163,24 @@ class StandardizerModel2(nn.Module):
         src_lengths = src_chars.ne(self.src_dict.pad()).sum(-1)
         encoder_out = self.lstm_model.encoder(src_chars, src_lengths=src_lengths,
                                               enforce_sorted=False)
+        # tgt_chars[tgt_chars == self.tgt_dict.eos()] = self.tgt_dict.pad()
         decoder_out, attn_scores = self.lstm_model.decoder(
-            tgt_chars, encoder_out=encoder_out)
+            tgt_chars[:, :-1], encoder_out=encoder_out)
         return decoder_out, attn_scores
 
-    def loss(self, decoder_out, target_chars):
-        char_mask = target_chars.ne(self.tgt_dict.pad())
+    def loss(self, decoder_out, tgt_chars):
+        tgt_chars = tgt_chars[:, 1:]
+        char_mask = tgt_chars.ne(self.tgt_dict.pad())
         lprobs = self.lstm_model.get_normalized_probs(decoder_out, log_probs=True)
         scores = lprobs[char_mask]
-        labels = target_chars[char_mask]
+        labels = tgt_chars[char_mask]
         return self.criterion(scores, labels)
 
-    def decode(self, src_chars, mask):
-        # src_lengths = ((src_chars.ne(self.src_dict.eos())
-        #                 & src_chars.ne(self.src_dict.pad())).long().sum(dim=1))
+    def decode(self, src_chars):
         src_lengths = src_chars.ne(self.src_dict.pad()).sum(-1)
         generator = SequenceGenerator(
             [self.lstm_model], self.tgt_dict, eos=self.tgt_dict.eos(),
-            search_strategy=search.BeamSearch(self.tgt_dict), beam_size=5,
+            search_strategy=search.BeamSearch(self.tgt_dict), beam_size=1,
             max_len_a=1)
         fairseq_batch = {
             'net_input': {
@@ -231,10 +188,7 @@ class StandardizerModel2(nn.Module):
                 'src_lengths': src_lengths
             }
         }
-        pu.db
         preds = generator.generate(self.lstm_model, fairseq_batch,
-                                   bos_token=self.tgt_dict.bos())
-        # # encoder_out = self.lstm_model.encoder(src_chars, src_lengths=src_lengths,
-        # #                                       enforce_sorted=False)
-        pu.db
-        return src_chars.argmax(-1)
+                                   bos_token=self.src_dict.bos())
+        pred_labels = [preds[i][0]['tokens'].tolist() for i in range(len(preds))]
+        return pred_labels

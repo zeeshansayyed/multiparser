@@ -15,7 +15,7 @@ from supar.utils.common import bos, pad, unk, eos
 from supar.utils.field import Field, SubwordField
 from supar.utils.fn import ispunct
 from supar.utils.logging import get_logger, progress_bar
-from supar.utils.metric import SegmentationMetric
+from supar.utils.metric import SegmentationMetric, StandardizationMetric
 from supar.utils.transform import StdSeg
 
 logger = get_logger(__name__)
@@ -191,6 +191,7 @@ class Segmenter(Parser):
             lens = char_mask.sum(-1).tolist()
             word_list.extend(chars[char_mask].split(lens))
             label_list.extend(pred_labels[char_mask].split(lens))
+        pu.db
         words = [self.CHAR.vocab[seq.tolist()] for seq in word_list]
         labels = [self.SEGL.vocab[seq.tolist()] for seq in label_list]
         words = [''.join(word).split() for word in words]
@@ -300,18 +301,18 @@ class Standardizer(Parser):
 
     def _train(self, loader):
         self.model.train()
-        bar, metric = progress_bar(loader), SegmentationMetric()
+        bar, metric = progress_bar(loader), StandardizationMetric()
 
-        for source_words, source_chars, target_chars in bar:
+        for source_words, src_chars, tgt_chars in bar:
             self.optimizer.zero_grad()
-            model_out = self.model(source_chars, target_chars)
-            loss = self.model.loss(model_out, target_chars)
+            model_out = self.model(src_chars, tgt_chars)
+            loss = self.model.loss(model_out, tgt_chars)
             loss.backward()
             nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)
             self.optimizer.step()
             self.scheduler.step()
-            # pred_labels = self.model.decode(model_out, None)
-            # metric(pred_labels, target_chars, None, target_chars.ne(0))
+            # pred_labels = self.model.decode(src_chars)
+            # metric(pred_labels, tgt_chars, None, tgt_chars.ne(0))
             bar.set_postfix_str(f"lr: {self.scheduler.get_last_lr()[0]:.4e} - loss: {loss:.4f} - {metric}")
 
     @torch.no_grad()
@@ -319,23 +320,37 @@ class Standardizer(Parser):
         self.model.eval()
         total_loss = 0
         # metric = SegmentationMetric(space_index=self.TCHAR.vocab.stoi[' '], compute_word_acc=True)
-        metric = SegmentationMetric()
+        metric = StandardizationMetric(space_idx=self.TCHAR.vocab.stoi[' '], compute_word_acc=True)
         for source_words, src_chars, tgt_chars in progress_bar(loader):
             model_out = self.model(src_chars, tgt_chars)
             loss = self.model.loss(model_out, tgt_chars)
-            pred_labels = self.model.decode(src_chars, None)
+            pred_labels = self.model.decode(src_chars)
             metric(pred_labels, tgt_chars, None, tgt_chars.ne(0))
         total_loss /= len(loader)
+        logger.info(f"Wrong: {metric.total_words - metric.correct_words} / {metric.total_words}")
         return total_loss, metric
 
     @torch.no_grad()
     def _predict(self, loader):
         self.model.eval()
         preds = {}
-        word_list, label_list = [], []
+        input_sents, pred_sents = [], []
         for source_words, source_chars in progress_bar(loader):
-            model_out = self.model(source_chars, target_chars)
-            pred_labels = self.model.decode(model_out, None)
+            preds = self.model.decode(source_chars)
+            pred_sents.extend(preds)
+            # word_mask = source_words.ne(2) & source_words.ne(0)
+            # word_lens = word_mask.sum(-1).tolist()
+            # input_sents.extend(source_words[word_mask].split(word_lens))
+            char_mask = source_chars.ne(2) & source_chars.ne(0) & source_chars.ne(3)
+            word_lens = char_mask.sum(-1).tolist()
+            input_sents.extend(source_chars[char_mask].split(word_lens))
+        raw_words = [self.SCHAR.vocab[seq.tolist()] for seq in input_sents]
+        raw_words = [''.join(seq).split() for seq in raw_words]
+        std_words = [self.TCHAR.vocab[seq[:-1]] for seq in pred_sents] # Ignore <eos>
+        std_words = [''.join(seq).split() for seq in std_words]
+        preds = {'words': raw_words, 'stdchars': std_words}
+        return preds
+            
 
     @classmethod
     def build(
@@ -343,7 +358,7 @@ class Standardizer(Parser):
         path,
         optimizer_args={'lr': 2e-3, 'betas': (.9, .9), 'eps': 1e-12},
         scheduler_args={'gamma': .75**(1 / 5000)},
-        min_freq=2,
+        min_freq=1,
         fix_len=512,
         **kwargs,
     ):
@@ -353,7 +368,7 @@ class Standardizer(Parser):
         if os.path.exists(path) and not args.build:
             parser = cls.load(**args)
             parser.model = cls.MODEL(**parser.args)
-            parser.model.load_pretrained(parser.WORD.embed).to(args.device)
+            parser.model.load_pretrained(parser.SWORD.embed).to(args.device)
             return parser
         logger.info("Building the fields")
         SWORD = Field('words', pad=pad, unk=unk, bos=bos, eos=eos)
@@ -389,3 +404,7 @@ class Standardizer(Parser):
         scheduler = ExponentialLR(optimizer, **scheduler_args)
 
         return cls(args, model, transform, optimizer, scheduler)
+
+
+class JointSegmenterStandardizer(Parser):
+    pass
