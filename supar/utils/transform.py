@@ -723,22 +723,27 @@ class TreeSentence(Sentence):
 
 class StdSeg(CoNLL):
 
-    fields = ['ID', 'RAW', 'SEG', 'SEGL', 'STD', 'STDCSEG', 'STDCSEGL']
+    fields = ['ID', 'RAW', 'SEG', 'SEGL', 'STD', 'STDSEG', 'STDSEGL']
 
-    def __init__(self, ID=None, RAW=None, SEG=None, SEGL=None, STD=None, STDCSEG=None, STDCSEGL=None):
+    def __init__(self, ID=None, RAW=None, SEG=None, SEGL=None, STD=None, STDSEG=None, STDSEGL=None):
         super().__init__()
         self.ID = ID
         self.RAW = RAW
         self.SEG = SEG
         self.SEGL = SEGL
         self.STD = STD
-        self.STDCSEG = STDCSEG
-        self.STDCSEGL = STDCSEGL
+        self.STDSEG = STDSEG
+        self.STDSEGL = STDSEGL
+        self.inputs = (self.RAW, )
+        self.targets = (self.SEG, self.SEGL, self.STD, self.STDSEG, self.STDSEGL)
 
     @property
     def src(self):
-        return (self.RAW,)
+        # return (self.RAW,)
+        # return self.RAW, self.SEGL
+        return self.inputs
 
     @property
     def tgt(self):
-        return self.SEG, self.SEGL, self.STD, self.STDCSEG, self.STDCSEGL
+        # return self.SEG, self.SEGL, self.STD, self.STDCSEG, self.STDCSEGL
+        return self.targets

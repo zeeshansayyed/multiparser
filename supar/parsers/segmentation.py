@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
 import os
-from supar.models.segmentation import StandardizerModel
 
 import torch
 import torch.nn as nn
@@ -9,14 +8,18 @@ from torch.optim.adam import Adam
 from torch.optim.lr_scheduler import ExponentialLR
 
 from supar.models import SegmenterModel
+from supar.models.segmentation import StandardizerModel, JointSegmenterStandardizerModel
+from supar.parsers.multiparsers import MultiTaskParser
 from supar.parsers.parser import Parser
 from supar.utils import Config, Dataset, Embedding
+from supar.utils import transform
+from supar.utils import metric
 from supar.utils.common import bos, pad, unk, eos
 from supar.utils.field import Field, SubwordField
 from supar.utils.fn import ispunct
 from supar.utils.logging import get_logger, progress_bar
 from supar.utils.metric import SegmentationMetric, StandardizationMetric
-from supar.utils.transform import StdSeg
+from supar.utils.transform import CoNLL, StdSeg
 
 logger = get_logger(__name__)
 
@@ -157,7 +160,7 @@ class Segmenter(Parser):
     def _evaluate(self, loader):
         self.model.eval()
         total_loss = 0
-        metric = SegmentationMetric(space_index=self.SEGL.vocab.stoi[' '], compute_word_acc=True)
+        metric = SegmentationMetric(space_idx=self.SEGL.vocab.stoi[' '], compute_word_acc=True)
         for words, *feats, gold_labels in progress_bar(loader):
             word_mask = words.ne(self.WORD.pad_index)
             word_mask[:, 0] = 0 # ignore the first token of each sentence
@@ -191,7 +194,7 @@ class Segmenter(Parser):
             lens = char_mask.sum(-1).tolist()
             word_list.extend(chars[char_mask].split(lens))
             label_list.extend(pred_labels[char_mask].split(lens))
-        pu.db
+
         words = [self.CHAR.vocab[seq.tolist()] for seq in word_list]
         labels = [self.SEGL.vocab[seq.tolist()] for seq in label_list]
         words = [''.join(word).split() for word in words]
@@ -350,7 +353,7 @@ class Standardizer(Parser):
         std_words = [''.join(seq).split() for seq in std_words]
         preds = {'words': raw_words, 'stdchars': std_words}
         return preds
-            
+
 
     @classmethod
     def build(
@@ -374,7 +377,7 @@ class Standardizer(Parser):
         SWORD = Field('words', pad=pad, unk=unk, bos=bos, eos=eos)
         SCHAR =  Field('chars', pad=pad, unk=unk, bos=bos, eos=eos, tokenize=simple_tokenize)
         TCHAR =  Field('stdchars', pad=pad, unk=unk, bos=bos, eos=eos, tokenize=simple_tokenize)
-    
+
         transform = StdSeg(RAW=(SWORD, SCHAR), STD=TCHAR)
 
         train = Dataset(transform, args.train)
@@ -406,5 +409,233 @@ class Standardizer(Parser):
         return cls(args, model, transform, optimizer, scheduler)
 
 
-class JointSegmenterStandardizer(Parser):
-    pass
+
+LABELLING_TASKS = ('raw-segl', 'std-stdsegl')
+SEQ2SEQ_TASKS = ('raw-std', 'seg-stdseg', 'raw-stdseg')
+
+
+class JointSegmenterStandardizer(MultiTaskParser):
+
+    NAME = "joint-segmenter-standardizer"
+    MODEL = JointSegmenterStandardizerModel
+
+    def __init__(self, args, model, transforms):
+        super().__init__(args, model, transforms)
+        # Since input fields are shared across tasks, we only store the one
+        # coming from the first transform
+        self.input_char, *self.input_feats = transforms[0].inputs
+        # Each value of the target_fields dict is a tuple itself
+        # with the first element being the target char field
+        self.target_fields = {
+            task_name: t.targets
+            for task_name, t in zip(args.task_names, transforms)
+        }
+
+    def _update_data_source_names(self, train, dev, test, task_names):
+        num_tasks = len(task_names)
+        train = [train] * num_tasks
+        dev = [dev] * num_tasks
+        test = [test] * num_tasks
+        return train, dev, test
+
+    def train(self, train, dev, test, task_names, buckets=32, batch_size=5000,
+              punct=False, tree=False, proj=False, partial=False, verbose=True,
+              **kwargs):
+        train, dev, test = self._update_data_source_names(train, dev, test, task_names)
+        return super().train(**Config().update(locals()))
+
+    def evaluate(self, data, buckets=8, batch_size=5000, punct=False, tree=True,
+                 proj=False, partial=False, verbose=True, **kwargs):
+        return super().evaluate(**Config().update(locals()))
+
+    def predict(self, data, pred=None, buckets=8, batch_size=5000, prob=False,
+                tree=True, proj=False, verbose=True, **kwargs):
+        return super().predict(**Config().update(locals()))
+
+    def _separate_train(self, loader, train_mode='train'):
+        self.model.train()
+        bar, metric = progress_bar(loader), SegmentationMetric()
+
+        # for words, *feats, arcs, rels, task_name in bar: #new
+        for src_chars, *feats, tgt_chars, task_name in bar:
+            self.optimizer.set_mode(task_name, train_mode)
+            self.scheduler.set_mode(task_name, train_mode)
+
+            self.optimizer.zero_grad()
+            src_mask = src_chars.ne(self.model.src_dict.pad())
+            model_out = self.model(src_chars, feats, tgt_chars, task_name, src_mask)
+            loss = self.model.loss(model_out, tgt_chars, task_name)
+            # mask = words.ne(self.WORD.pad_index)
+            # # ignore the first token of each sentence
+            # mask[:, 0] = 0
+            # s_arc, s_rel = self.model(words, feats, task_name)
+            # loss = self.model.loss(s_arc, s_rel, arcs, rels, mask,
+            #                        self.args.partial)
+            loss.backward()
+            nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)
+            self.optimizer.step()
+            self.scheduler.step()
+
+            # preds = self.model.decode(src_chars, feats, task_name, src_mask)
+            # ignore all punctuation if not specified
+            # if not self.args.punct:
+            #     src_mask &= words.unsqueeze(-1).ne(self.puncts).all(-1)
+
+            # metric(arc_preds, rel_preds, arcs, rels, mask)
+            bar.set_postfix_str(
+                f"lr: {self.scheduler.get_last_lr(task_name)[0]:.4e} - loss: {loss:.4f}"
+            )
+
+    def _joint_train(self, loader, train_mode='train'):
+        self.model.train()
+        bar = progress_bar(loader)
+        self.optimizer.set_mode(self.args.task_names, train_mode)
+        self.scheduler.set_mode(self.args.task_names, train_mode)
+        for inputs, targets in bar:
+            src_chars, *feats = inputs.values()
+            self.optimizer.zero_grad()
+            shared_out = self.model.shared_forward(src_chars, feats)
+            losses = []
+            for t_name, t_targets in targets.items():
+                tgt_chars = list(t_targets.values())[0] # TODO: Make this generic
+                model_out = self.model.unshared_forward(shared_out, tgt_chars, t_name)
+                loss = self.model.loss(model_out, tgt_chars, t_name)
+                losses.append(loss)
+            joint_loss = sum(losses)
+            joint_loss.backward()
+            nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)
+            self.optimizer.step()
+            self.scheduler.step()
+            bar.set_postfix_str(
+                f"lr: {self.scheduler.get_last_lr()[0]:.4e} - loss: {joint_loss:.4f}"
+            )
+
+    def _train(self, loader, train_mode='train'):
+        if self.args.joint_loss and train_mode == 'train':
+            self._joint_train(loader, train_mode=train_mode)
+        else:
+            self._separate_train(loader, train_mode=train_mode)
+
+    @torch.no_grad()
+    def _evaluate(self, loader, task_name):
+        self.model.eval()
+        total_loss = 0
+        if task_name in LABELLING_TASKS:
+            metric = SegmentationMetric(
+                space_idx=self.target_fields[task_name][0].vocab.stoi[' '],
+                compute_word_acc=True)
+        elif task_name in SEQ2SEQ_TASKS:
+            metric = StandardizationMetric(
+                space_idx=self.target_fields[task_name][0].vocab.stoi[' '],
+                compute_word_acc=True)
+        else:
+            raise Exception(
+                f"Task name ({task_name}) not supported in _evaluate()")
+
+        for src_chars, *feats, tgt_chars in progress_bar(loader):
+            src_mask = src_chars.ne(self.model.src_dict.pad())
+            model_out = self.model(src_chars, feats, tgt_chars, task_name,
+                                   src_mask)
+            loss = self.model.loss(model_out, tgt_chars, task_name)
+            preds = self.model.decode(src_chars, feats, task_name, src_mask)
+            total_loss += loss.item()
+            metric(preds, tgt_chars, None, src_mask)
+        total_loss /= len(loader)
+        return total_loss, metric
+
+    def _predict(self, loader, task_name):
+        # args.task_names was saved in parser while training
+        # args.task was provided as cmd line args while evaluation
+        task_id = self.args.task_names.index(task_name)
+        self.model.eval()
+        preds = {}
+        input_sents, pred_sents = [], []
+        for src_chars, *feats in loader:
+            src_mask = src_chars.ne(self.model.src_dict.pad())
+            preds = self.model.decode(src_chars, feats, task_name, src_mask)
+            pred_sents.extend(preds)
+            char_mask = src_chars.ne(2) & src_chars.ne(0) & src_chars.ne(3)
+            word_lens = char_mask.sum(-1).tolist()
+            input_sents.extend(src_chars[char_mask].split(word_lens))
+        raw_words = [self.input_char.vocab[seq.tolist()] for seq in input_sents]
+        raw_words = [''.join(seq).split() for seq in raw_words]
+        pred_words = [self.target_fields[task_name][0].vocab[seq[:-1]] for seq in pred_sents] # Ignore <eos>
+        pred_words = [''.join(seq).split() for seq in pred_words]
+        preds = {'words': raw_words}
+        preds[self.target_fields[task_name][0].name] = pred_words
+        return preds
+
+
+    @classmethod
+    def build(cls, path, min_freq=1, fix_len=20, **kwargs):
+        args = Config(**locals())
+        args.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if os.path.exists(path) and not args.build:
+            parser = cls.load(**args)
+            parser.model = cls.MODEL(**parser.args)
+            parser.model.load_pretrained(parser.SWORD.embed).to(args.device)
+            return parser
+
+        logger.info("Building the fields")
+        RAW_WORD = Field('raw_words', pad=pad, unk=unk, bos=bos, eos=eos)
+        RAW_CHAR = Field('raw_chars', pad=pad, unk=unk, bos=bos, eos=eos, tokenize=simple_tokenize)
+        SEG_CHAR = Field('seg_chars', pad=pad, unk=unk, bos=bos, eos=eos, tokenize=simple_tokenize)
+        SEG_LABEL = Field('seg_labels', pad=pad, unk=unk, bos=bos, eos=eos, tokenize=simple_tokenize)
+        STD_CHAR =  Field('std_chars', pad=pad, unk=unk, bos=bos, eos=eos, tokenize=simple_tokenize)
+        STDSEG_CHAR =  Field('stdseg_chars', pad=pad, unk=unk, bos=bos, eos=eos, tokenize=simple_tokenize)
+        STDSEG_LABEL = Field('stdseg_labels', pad=pad, unk=unk, bos=bos, eos=eos, tokenize=simple_tokenize)
+
+        def get_transform(task_name):
+            if task_name == 'raw-segl':
+                transform = StdSeg(RAW=RAW_CHAR, SEGL=SEG_LABEL)
+                transform.inputs = (RAW_CHAR,)
+                transform.targets = (SEG_LABEL,)
+            elif task_name == 'raw-std':
+                transform = StdSeg(RAW=RAW_CHAR, STD=STD_CHAR)
+                transform.inputs = (RAW_CHAR,)
+                transform.targets = (STD_CHAR,)
+            elif task_name == 'seg-stdseg':
+                transform = StdSeg(SEG=SEG_CHAR, STDSEG=STDSEG_CHAR)
+                transform.inputs = (SEG_CHAR,)
+                transform.targets = (STDSEG_CHAR,)
+            elif task_name == 'std-stdsegl':
+                transform = StdSeg(STD=STD_CHAR, STDSEGL=STDSEG_LABEL)
+                transform.inputs = (STD_CHAR,)
+                transform.targets = (STDSEG_LABEL,)
+            else:
+                raise Exception(f"Task Name ({task_name}) is not supported")
+            return transform
+
+        transforms = [get_transform(task_name) for task_name in args.task_names]
+        trains = [Dataset(transform, args.train, **args) for transform in transforms]
+        for transform, trainD in zip(transforms, trains):
+            for field in transform:
+                if field is not None:
+                    field.build(trainD)
+
+        # Currently we only support character dictionaries and hance char embeddings
+        # Modify this to support word dictionaries/embeddings
+        src_dict = FairseqDictWrapper(transforms[0].inputs[0])
+        # Every task will have its own target_dictionary
+        tgt_dicts = {
+            task_name: FairseqDictWrapper(transform.targets[0])
+            for task_name, transform in zip(args.task_names, transforms)
+        }
+
+        args.update({
+            'src_dict': src_dict,
+            'tgt_dicts': tgt_dicts,
+            'train': [args.train] * len(args.task_names),
+            'dev': [args.dev] * len(args.task_names),
+            'test': [args.test] * len(args.task_names),
+        })
+
+        logger.info("Building the model")
+        # * We do not load pretrained word embeddings for now. IF you want to support
+        # * then figure standardize how char and word embeddings are input to transform
+        # * and the call `load_pretrained()`
+        # model = cls.MODEL(**args).load_pretrained(SWORD.embed).to(args.device)
+        model = cls.MODEL(**args).to(args.device)
+        logger.info(f"{model}\n")
+        return cls(args, model, transforms)

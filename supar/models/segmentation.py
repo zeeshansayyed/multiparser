@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 
-from fairseq import search
-from supar.utils.seq2seq import EncoderRNN, AttnDecoderRNN, Seq2Seq, Attention
-from fairseq.models.lstm import LSTMModel, LSTMEncoder, LSTMDecoder
-from fairseq.sequence_generator import SequenceGenerator
-from torch._C import BenchmarkConfig
-from supar.modules import LSTM, MLP
-from supar.utils import Config
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+
+from supar.modules import LSTM, MLP
+from supar.utils import Config
+from supar.utils.seq2seq import EncoderRNN, AttnDecoderRNN, Seq2Seq, Attention
+
+from fairseq import search
+from fairseq.models.lstm import LSTMModel, LSTMEncoder, LSTMDecoder
+from fairseq.sequence_generator import SequenceGenerator
+
 import pudb
 
 MAX_SOURCE_POSITIONS = 4096
@@ -191,4 +193,151 @@ class StandardizerModel(nn.Module):
         preds = generator.generate(self.lstm_model, fairseq_batch,
                                    bos_token=self.src_dict.bos())
         pred_labels = [preds[i][0]['tokens'].tolist() for i in range(len(preds))]
+        return pred_labels
+
+
+
+LABELLING_TASKS = ('raw-segl', 'std-stdsegl')
+SEQ2SEQ_TASKS = ('raw-std', 'seg-stdseg', 'raw-stdseg')
+
+
+class JointSegmenterStandardizerModel(nn.Module):
+    """ Implementation of Joint Standardizer and Segmenter Model
+    """
+    def __init__(self, task_names, src_dict, tgt_dicts, n_embed=100,
+                 n_lstm_hidden=400, n_lstm_layers=3, embed_dropout=.33,
+                 lstm_dropout=.33, top_dropout=.33, pad_index=0, unk_index=1,
+                 **kwargs):
+        super().__init__()
+        self.args = Config().update(locals())
+        self.src_dict = src_dict
+        self.tgt_dicts = tgt_dicts
+        self.encoder = LSTMEncoder(
+            dictionary=src_dict,
+            embed_dim=n_embed,
+            hidden_size=n_lstm_hidden,
+            num_layers=n_lstm_layers,
+            dropout_in=embed_dropout,
+            dropout_out=lstm_dropout,
+            bidirectional=True,
+            left_pad=False,
+            pretrained_embed=None,
+            max_source_positions=MAX_SOURCE_POSITIONS,
+        )
+        decoders = {}
+        for task_name in task_names:
+            if task_name in LABELLING_TASKS:
+                decoders[task_name] = MLP(n_in=n_lstm_hidden * 2,
+                                          n_out=len(tgt_dicts[task_name]),
+                                          dropout=top_dropout)
+            elif task_name in SEQ2SEQ_TASKS:
+                decoders[task_name] = LSTMDecoder(
+                    dictionary=tgt_dicts[task_name],
+                    embed_dim=n_embed,
+                    hidden_size=n_lstm_hidden,
+                    out_embed_dim=n_lstm_hidden,
+                    num_layers=n_lstm_layers,
+                    dropout_in=embed_dropout,
+                    dropout_out=lstm_dropout,
+                    attention=True,
+                    encoder_output_units=n_lstm_hidden * 2,
+                    pretrained_embed=None,
+                    share_input_output_embed=False,
+                    adaptive_softmax_cutoff=None,
+                    max_target_positions=MAX_SOURCE_POSITIONS,
+                    residuals=False,
+                )
+            else:
+                raise Exception(f"Task ({task_name}) is not supported")
+        self.decoders = nn.ModuleDict(decoders)
+        self.criterion = nn.CrossEntropyLoss()
+
+    def load_pretrained(self, embed=None):
+        if embed is not None:
+            self.pretrained = nn.Embedding.from_pretrained(embed)
+            nn.init.zeros_(self.word_embed.weight)
+        return self
+
+    def get_shared_parameters(self):
+        for name, param in self.named_parameters():
+            if not (('decoders' in name) or ('rel_attn' in name) or (self.args.share_mlp and 'mlp' in name)):
+                yield param
+
+    def get_task_specific_parameters(self, task_name):
+        for name, param in self.named_parameters():
+            if task_name in name.split('.'):
+                yield param
+
+    def freeze_shared(self):
+        for name, param in self.named_parameters():
+            if not (('decoders' in name) or ('rel_attn' in name) or (self.args.share_mlp and 'mlp' in name)):
+                param.requires_grad = False
+
+    def shared_forward(self, src_chars, feats, mask=None):
+        if mask is None:
+            mask = src_chars.ne(self.src_dict.pad())
+        src_lengths = mask.sum(-1)
+        encoder_out = self.encoder(src_chars, src_lengths=src_lengths, enforce_sorted=False)
+        return encoder_out
+
+    def unshared_forward(self, shared_out, tgt_chars, task_name):
+        decoder = self.decoders[task_name]
+        if isinstance(decoder, MLP):
+            x, final_hidden, final_cells, encoder_padding_mask = shared_out
+            decoder_out = decoder(x)
+        else:
+            decoder_out, attn_scores = decoder(tgt_chars[:, :-1], encoder_out=shared_out)
+        return decoder_out
+
+    def forward(self, src_chars, feats, tgt_chars, task_name, src_mask=None):
+        shared_out = self.shared_forward(src_chars, feats, src_mask)
+        decoder_out = self.unshared_forward(shared_out, tgt_chars, task_name)
+        return decoder_out
+
+    def loss(self, model_out, tgt_chars, task_name):
+        tgt_dict = self.tgt_dicts[task_name]
+        bos_idx, eos_idx, pad_idx = tgt_dict.bos(), tgt_dict.eos(), tgt_dict.pad()
+        n_labels = len(tgt_dict)
+        if task_name in LABELLING_TASKS:
+            tgt_mask = (tgt_chars.ne(bos_idx) & tgt_chars.ne(eos_idx) & tgt_chars.ne(pad_idx))
+            # Because fairseq output isn't batch first, we take transpose and make it
+            scores = model_out.transpose(0, 1)[tgt_mask].view(-1, n_labels)
+            labels = tgt_chars[tgt_mask].view(-1)
+        elif task_name in SEQ2SEQ_TASKS:
+            tgt_chars = tgt_chars[:, 1:]
+            tgt_mask = tgt_chars.ne(pad_idx)
+            # lprobs = self.decoders[task_name].get_normalized_probs(model_out, log_probs=True)
+            lprobs = F.log_softmax(model_out, dim=-1)
+            scores = lprobs[tgt_mask]
+            labels = tgt_chars[tgt_mask]
+        else:
+            raise Exception(f"Task Name ({task_name}) not supported in loss")
+        return self.criterion(scores, labels)
+
+    def decode(self, src_chars, feats, task_name, src_mask):
+        tgt_dict = self.tgt_dicts[task_name]
+        bos_idx, eos_idx, pad_idx = tgt_dict.bos(), tgt_dict.eos(), tgt_dict.pad()
+        n_labels = len(tgt_dict)
+        if task_name in LABELLING_TASKS:
+            model_out = self.forward(src_chars, feats, None, task_name, src_mask)
+            # Because fairseq output isn't batch first, we take transpose and make it
+            pred_labels = model_out.transpose(0, 1).argmax(-1)
+        elif task_name in SEQ2SEQ_TASKS:
+            src_lengths = src_mask.sum(-1)
+            lstm_model = LSTMModel(self.encoder, self.decoders[task_name])
+            generator = SequenceGenerator(
+                [lstm_model], tgt_dict, eos=eos_idx,
+                search_strategy=search.BeamSearch(tgt_dict), beam_size=1,
+                max_len_a=1)
+            fairseq_batch = {
+                'net_input': {
+                    'src_tokens': src_chars,
+                    'src_lengths': src_lengths
+                }
+            }
+            preds = generator.generate(lstm_model, fairseq_batch,
+                                       bos_token=self.src_dict.bos())
+            pred_labels = [preds[i][0]['tokens'].tolist() for i in range(len(preds))]
+        else:
+            raise Exception(f"Task Name ({task_name}) not supported in decode")
         return pred_labels

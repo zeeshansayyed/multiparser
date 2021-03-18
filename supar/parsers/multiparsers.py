@@ -24,7 +24,7 @@ from supar.utils.field import Field, SubwordField
 from supar.utils.common import bos, pad, unk
 from supar.utils.transform import CoNLL
 from supar.utils.optim import MultiTaskOptimizer, MultiTaskScheduler
-
+import pudb
 
 class MultiTaskParser(Parser):
 
@@ -267,6 +267,7 @@ class MultiTaskParser(Parser):
 
                     for name, value in preds.items():
                         setattr(dataset, name, value)
+
                     if is_master():
                         if args.pred is None:
                             pred = args.exp_dir / f"{path.stem}-{os.path.split(data)[-1]}"
@@ -303,11 +304,12 @@ class MultiTaskParser(Parser):
         for loader, tname in zip(loaders, task_names):
             losses[tname], metrics[tname] = self._evaluate(loader, tname)
 
-        losses['total'] = sum(losses.values())
-        total_metric = AttachmentMetric()
-        for m in metrics.values():
-            total_metric += m
-        metrics['total'] = total_metric
+        # TODO: This is a TEMPORARY hack to avoid task-specific metrics. 
+        # losses['total'] = sum(losses.values())
+        # total_metric = AttachmentMetric()
+        # for m in metrics.values():
+        #     total_metric += m
+        # metrics['total'] = total_metric
         return losses, metrics
 
 class MultiBiaffineDependencyParser(MultiTaskParser):

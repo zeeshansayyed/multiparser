@@ -218,7 +218,7 @@ class ChartMetric(Metric):
 import pudb
 class SegmentationMetric(Metric):
 
-    def __init__(self, eps=1e-12, space_index=3, compute_word_acc=False) -> None:
+    def __init__(self, eps=1e-12, space_idx=3, compute_word_acc=False) -> None:
         super().__init__()
         self.eps = eps
         self.n = 0.0
@@ -226,7 +226,7 @@ class SegmentationMetric(Metric):
         self.correct_chars = 0.0
         self.total_words = 0.0
         self.total_chars = 0.0
-        self.space_index = space_index
+        self.space_index = space_idx
         self.compute_word_acc = compute_word_acc
 
     def __repr__(self) -> str:
@@ -237,7 +237,7 @@ class SegmentationMetric(Metric):
         return s
 
     def __call__(self, pred_labels, gold_labels, word_mask, char_mask):
-        pu.db
+        char_mask = (gold_labels.ne(2) & gold_labels.ne(3) & gold_labels.ne(0))
         self.total_chars += char_mask.sum()
         res = pred_labels.eq(gold_labels)[char_mask]
         self.correct_chars += res.sum()

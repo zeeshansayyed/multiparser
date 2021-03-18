@@ -121,10 +121,11 @@ class JointDataset(torch.utils.data.Dataset):
         self.task_names = task_names
         self.num_sentences = len(datasets[0].sentences)
         assert all(len(d.sentences) == self.num_sentences for d in datasets)
-        self.sentences, self.fields = {}, {}
+        self.sentences, self.fields, self.transforms = {}, {}, {}
         for name, dataset in zip(task_names, datasets):
             self.sentences[name] = dataset.sentences
             self.fields[name] = dataset.fields
+            self.transforms[name] = dataset.transform
         self.buckets = datasets[0].buckets
 
         # self.sentences = {
@@ -162,12 +163,14 @@ class JointDataset(torch.utils.data.Dataset):
         sample = {'inputs': {}, 'targets': {tn: {} for tn in self.task_names}}
         first_task = self.task_names[0]
         for f, d in self.fields[first_task].items():
-            if f.name not in ('rels', 'arcs'):
+            # if f.name not in ('rels', 'arcs'):
+            if f not in self.transforms[first_task].targets:
                 sample['inputs'][f] = d[index]
 
         for task_name, fields in self.fields.items():
             for f, d in fields.items():
-                if f.name in ('rels', 'arcs'):
+                # if f.name in ('rels', 'arcs'):
+                if f in self.transforms[task_name].targets:
                     sample['targets'][task_name][f] = d[index]
 
         return sample
