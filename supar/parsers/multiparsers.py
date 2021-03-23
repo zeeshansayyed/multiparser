@@ -140,6 +140,19 @@ class MultiTaskParser(Parser):
         else:
             train_loader = MultitaskDataLoader(args.task_names, train)
 
+        if args.loss_weights:
+            assert len(args.loss_weights) == len(args.task_names)
+            self.args.loss_weights = {
+                task_name: float(loss_ratio)
+                for task_name, loss_ratio in zip(args.task_names,
+                                                 args.loss_weights)
+            }
+        else:
+            self.args.loss_weights = { 
+                task_name: 1.0
+                for task_name in args.task_names
+            }
+
         dev_loaders = [d.loader for d in dev]
         test_loaders = [d.loader for d in test]
 
@@ -226,7 +239,7 @@ class MultiTaskParser(Parser):
                     start = datetime.now()
                     loss, metric = parser._evaluate(dataset.loader, task)
                     logger.info(f"Data={os.path.split(data)[-1]}\tModel={path.name}\tMetric={metric}")
-                
+
         return loss, metric
 
     def predict(self, data, pred=None, buckets=8, batch_size=5000, prob=False,
@@ -389,6 +402,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
             s_arc, s_rel = self.model(words, feats, task_name)
             loss = self.model.loss(s_arc, s_rel, arcs, rels, mask,
                                    self.args.partial)
+            loss *= self.args.loss_weights[task_name]
             loss.backward()
             nn.utils.clip_grad_norm_(self.model.parameters(), self.args.clip)
             self.optimizer.step()
@@ -582,7 +596,7 @@ class MultiBiaffineDependencyParser(MultiTaskParser):
         for i in range(1, len(train)):
             combined_train.sentences += train[i].sentences
 
-        WORD.build(combined_train, args.min_freq, 
+        WORD.build(combined_train, args.min_freq,
                    (Embedding.load(args.embed, args.unk) if args.embed else None))
         if TAG is not None:
             TAG.build(combined_train)

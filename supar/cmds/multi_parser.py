@@ -33,6 +33,7 @@ def main():
     subparser.add_argument('--optimizer-type', choices=['single', 'multiple'], default='single')
     subparser.add_argument('--finetune', choices=['partial', 'whole'], default=None, help="If specified, training is followed by finetuning.")
     subparser.add_argument('--train-mode', choices=['train', 'finetune'], default='train', help="Whether to train a new model or finetune an existing one.")
+    subparser.add_argument('--loss-weights', default=None, nargs='+', help="Weight multipliers for task specific losses. You can also specify 'auto'")
     # evaluate
     # If you specify a specific model in --path, that model will be evaluated
     # If you specify an exp dir, then all ".model" files in that directory will be evaluated
