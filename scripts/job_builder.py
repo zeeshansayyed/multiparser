@@ -198,14 +198,14 @@ def build(lang_name, lang_code, treebank, tasks, features, use_fasttext, seeds,
 
     task_data = {
         'ud': {
-            'train': f'data/ud/ud-treebanks-v2.6/UD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-ud-train.conllu',
-            'dev': f'data/ud/ud-treebanks-v2.6/UD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-ud-dev.conllu',
-            'test': f'data/ud/ud-treebanks-v2.6/UD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-ud-test.conllu',
+            'train': f'data/ud/ud-treebanks-v2.7/UD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-ud-train.conllu',
+            'dev': f'data/ud/ud-treebanks-v2.7/UD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-ud-dev.conllu',
+            'test': f'data/ud/ud-treebanks-v2.7/UD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-ud-test.conllu',
         },
         'sud': {
-            'train': f'data/sud/sud-treebanks-v2.6/SUD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-sud-train.conllu',
-            'dev': f'data/sud/sud-treebanks-v2.6/SUD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-sud-dev.conllu',
-            'test': f'data/sud/sud-treebanks-v2.6/SUD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-sud-test.conllu',
+            'train': f'data/sud/sud-treebanks-v2.7/SUD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-sud-train.conllu',
+            'dev': f'data/sud/sud-treebanks-v2.7/SUD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-sud-dev.conllu',
+            'test': f'data/sud/sud-treebanks-v2.7/SUD_{lang_name.title()}-{treebank}/{lang_code}_{treebank.lower()}-sud-test.conllu',
         }
     }
 
