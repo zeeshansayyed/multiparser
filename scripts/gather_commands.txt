@@ -1,0 +1,253 @@
+python scripts/new_gather.py -l hungarian -et ud-sud -en szeged-tag
+python scripts/new_gather.py -l hungarian -et ud-sud -en szeged-tag-ft
+python scripts/new_gather.py -l hungarian -et ud-sud -en szeged-char
+python scripts/new_gather.py -l hungarian -et ud-sud -en szeged-char-ft
+python scripts/new_gather.py -l hungarian -et ud-sud -en szeged-tag-char-ft
+
+python scripts/new_gather.py -l russian -en ud-gsd-tag -b
+python scripts/new_gather.py -l russian -en sud-gsd-tag -b
+python scripts/new_gather.py -l russian -en ud-gsd-tag-ft -b
+python scripts/new_gather.py -l russian -en sud-gsd-tag-ft -b
+python scripts/new_gather.py -l russian -en ud-gsd-char -b
+python scripts/new_gather.py -l russian -en sud-gsd-char -b
+python scripts/new_gather.py -l russian -en ud-gsd-char-ft -b
+python scripts/new_gather.py -l russian -en sud-gsd-char-ft -b
+python scripts/new_gather.py -l russian -en ud-gsd-tag-char-ft -b
+python scripts/new_gather.py -l russian -en sud-gsd-tag-char-ft -b
+
+python scripts/new_gather.py -l russian -et ud-sud -en gsd-tag
+python scripts/new_gather.py -l russian -et ud-sud -en gsd-tag-ft
+python scripts/new_gather.py -l russian -et ud-sud -en gsd-char
+python scripts/new_gather.py -l russian -et ud-sud -en gsd-char-ft
+python scripts/new_gather.py -l russian -et ud-sud -en gsd-tag-char-ft
+
+python scripts/new_gather.py -l turkish -en ud-imst-tag -b
+python scripts/new_gather.py -l turkish -en sud-imst-tag -b
+python scripts/new_gather.py -l turkish -en ud-imst-tag-ft -b
+python scripts/new_gather.py -l turkish -en sud-imst-tag-ft -b
+python scripts/new_gather.py -l turkish -en ud-imst-char -b
+python scripts/new_gather.py -l turkish -en sud-imst-char -b
+python scripts/new_gather.py -l turkish -en ud-imst-char-ft -b
+python scripts/new_gather.py -l turkish -en sud-imst-char-ft -b
+python scripts/new_gather.py -l turkish -en ud-imst-tag-char-ft -b
+python scripts/new_gather.py -l turkish -en sud-imst-tag-char-ft -b
+
+python scripts/new_gather.py -l turkish -et ud-sud -en imst-tag
+python scripts/new_gather.py -l turkish -et ud-sud -en imst-tag-ft
+python scripts/new_gather.py -l turkish -et ud-sud -en imst-char
+python scripts/new_gather.py -l turkish -et ud-sud -en imst-char-ft
+python scripts/new_gather.py -l turkish -et ud-sud -en imst-tag-char-ft
+
+python scripts/new_gather.py -l vietnamese -en ud-vtb-tag -b
+python scripts/new_gather.py -l vietnamese -en sud-vtb-tag -b
+python scripts/new_gather.py -l vietnamese -en ud-vtb-tag-ft -b
+python scripts/new_gather.py -l vietnamese -en sud-vtb-tag-ft -b
+python scripts/new_gather.py -l vietnamese -en ud-vtb-char -b
+python scripts/new_gather.py -l vietnamese -en sud-vtb-char -b
+python scripts/new_gather.py -l vietnamese -en ud-vtb-char-ft -b
+python scripts/new_gather.py -l vietnamese -en sud-vtb-char-ft -b
+python scripts/new_gather.py -l vietnamese -en ud-vtb-tag-char-ft -b
+python scripts/new_gather.py -l vietnamese -en sud-vtb-tag-char-ft -b
+
+python scripts/new_gather.py -l vietnamese -et ud-sud -en vtb-tag
+python scripts/new_gather.py -l vietnamese -et ud-sud -en vtb-tag-ft
+python scripts/new_gather.py -l vietnamese -et ud-sud -en vtb-char
+python scripts/new_gather.py -l vietnamese -et ud-sud -en vtb-char-ft
+python scripts/new_gather.py -l vietnamese -et ud-sud -en vtb-tag-char-ft
+
+python scripts/new_gather.py -l german -en ud-gsd-tag -b
+python scripts/new_gather.py -l german -en sud-gsd-tag -b
+python scripts/new_gather.py -l german -en ud-gsd-tag-ft -b
+python scripts/new_gather.py -l german -en sud-gsd-tag-ft -b
+python scripts/new_gather.py -l german -en ud-gsd-char -b
+python scripts/new_gather.py -l german -en sud-gsd-char -b
+python scripts/new_gather.py -l german -en ud-gsd-char-ft -b
+python scripts/new_gather.py -l german -en sud-gsd-char-ft -b
+python scripts/new_gather.py -l german -en ud-gsd-tag-char-ft -b
+python scripts/new_gather.py -l german -en sud-gsd-tag-char-ft -b
+
+python scripts/new_gather.py -l german -et ud-sud -en gsd-tag
+python scripts/new_gather.py -l german -et ud-sud -en gsd-tag-ft
+python scripts/new_gather.py -l german -et ud-sud -en gsd-char
+python scripts/new_gather.py -l german -et ud-sud -en gsd-char-ft
+python scripts/new_gather.py -l german -et ud-sud -en gsd-tag-char-ft
+
+python scripts/new_gather.py -l arabic --seeds 10 -en ud-padt-tag -b
+python scripts/new_gather.py -l arabic --seeds 10 -en sud-padt-tag -b
+python scripts/new_gather.py -l arabic --seeds 10 -en ud-padt-tag-ft -b
+python scripts/new_gather.py -l arabic --seeds 10 -en sud-padt-tag-ft -b
+python scripts/new_gather.py -l arabic --seeds 10 -en ud-padt-char -b
+python scripts/new_gather.py -l arabic --seeds 10 -en sud-padt-char -b
+python scripts/new_gather.py -l arabic --seeds 10 -en ud-padt-char-ft -b
+python scripts/new_gather.py -l arabic --seeds 10 -en sud-padt-char-ft -b
+python scripts/new_gather.py -l arabic --seeds 10 -en ud-padt-tag-char-ft -b
+python scripts/new_gather.py -l arabic --seeds 10 -en sud-padt-tag-char-ft -b
+
+python scripts/new_gather.py -l arabic --seeds 10 -et ud-sud -en padt-tag
+python scripts/new_gather.py -l arabic --seeds 10 -et ud-sud -en padt-tag-ft
+python scripts/new_gather.py -l arabic --seeds 10 -et ud-sud -en padt-char
+python scripts/new_gather.py -l arabic --seeds 10 -et ud-sud -en padt-char-ft
+python scripts/new_gather.py -l arabic --seeds 10 -et ud-sud -en padt-tag-char-ft
+
+python scripts/new_gather.py -l korean -en ud-gsd-tag -b
+python scripts/new_gather.py -l korean -en sud-gsd-tag -b
+python scripts/new_gather.py -l korean -en ud-gsd-tag-ft -b
+python scripts/new_gather.py -l korean -en sud-gsd-tag-ft -b
+python scripts/new_gather.py -l korean -en ud-gsd-char -b
+python scripts/new_gather.py -l korean -en sud-gsd-char -b
+python scripts/new_gather.py -l korean -en ud-gsd-char-ft -b
+python scripts/new_gather.py -l korean -en sud-gsd-char-ft -b
+python scripts/new_gather.py -l korean -en ud-gsd-tag-char-ft -b
+python scripts/new_gather.py -l korean -en sud-gsd-tag-char-ft -b
+
+python scripts/new_gather.py -l korean -et ud-sud -en gsd-tag
+python scripts/new_gather.py -l korean -et ud-sud -en gsd-tag-ft
+python scripts/new_gather.py -l korean -et ud-sud -en gsd-char
+python scripts/new_gather.py -l korean -et ud-sud -en gsd-char-ft
+python scripts/new_gather.py -l korean -et ud-sud -en gsd-tag-char-ft
+
+python scripts/job_builder.py -ln arabic -lc ar -t padt --features char tag tag-char --seeds 10 --use-fasttext both > jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln chinese -lc zh -t gsd --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln english -lc en -t ewt --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln greek -lc el -t gdt --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln korean -lc ko -t gsd --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln russian -lc ru -t gsd --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln turkish -lc tr -t imst --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+python scripts/job_builder.py -ln vietnamese -lc vi -t vtb --features char tag tag-char --seeds 10 --use-fasttext both >> jobs/baseline_pred.jobs
+
+# Train jobs for baseline tag-char-ft
+python scripts/job_builder.py -ln arabic -lc ar -t padt --features tag-char --seeds 10 --use-fasttext true --jobs bt > jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln chinese -lc zh -t gsd --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln english -lc en -t ewt --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln greek -lc el -t gdt --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln korean -lc ko -t gsd --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln russian -lc ru -t gsd --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln turkish -lc tr -t imst --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln vietnamese -lc vi -t vtb --features tag-char --seeds 10 --use-fasttext true --jobs bt >> jobs/misc/base_tag_char_ft.jobs
+
+# Predict jobs for baseline tag-char-ft
+python scripts/job_builder.py -ln arabic -lc ar -t padt --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln chinese -lc zh -t gsd --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln english -lc en -t ewt --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln greek -lc el -t gdt --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln korean -lc ko -t gsd --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln russian -lc ru -t gsd --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln turkish -lc tr -t imst --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+python scripts/job_builder.py -ln vietnamese -lc vi -t vtb --features tag-char --seeds 10 --use-fasttext true --jobs bp >> jobs/misc/base_tag_char_ft.jobs
+
+# SPMRL Train jobs for german and hungarian
+python scripts/job_builder.py -ln german -lc de -t gsd        --losses alternating --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs mt bt --tasks ud --additional-tasks spmrl --additional-train data/spmrl/german/train.German.gold.conll --additional-dev data/spmrl/german/dev.German.gold.conll --additional-test data/spmrl/german/test.German.gold.conll --embed-extension spmrlgsd > jobs/misc/spmrl.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd        --losses alternating --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs mt bt --tasks sud --additional-tasks spmrl --additional-train data/spmrl/german/train.German.gold.conll --additional-dev data/spmrl/german/dev.German.gold.conll --additional-test data/spmrl/german/test.German.gold.conll --embed-extension spmrlgsd >> jobs/misc/spmrl.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged  --losses alternating --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs mt bt --tasks ud --additional-tasks spmrl --additional-train data/spmrl/hungarian/train.Hungarian.gold.conll --additional-dev data/spmrl/hungarian/dev.Hungarian.gold.conll --additional-test data/spmrl/hungarian/test.Hungarian.gold.conll --embed-extension spmrlpadt >> jobs/misc/spmrl.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged  --losses alternating --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs mt bt --tasks sud --additional-tasks spmrl --additional-train data/spmrl/hungarian/train.Hungarian.gold.conll --additional-dev data/spmrl/hungarian/dev.Hungarian.gold.conll --additional-test data/spmrl/hungarian/test.Hungarian.gold.conll --embed-extension spmrlpadt >> jobs/misc/spmrl.jobs
+# SPMRL Evaluate/Predict jobs for german and hungarian
+python scripts/job_builder.py -ln german -lc de -t gsd        --losses alternating  --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs me mp be bp --tasks ud --additional-tasks spmrl --additional-train data/spmrl/german/train.German.gold.conll --additional-dev data/spmrl/german/dev.German.gold.conll --additional-test data/spmrl/german/test.German.gold.conll --embed-extension spmrlgsd >> jobs/misc/spmrl.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd        --losses alternating  --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs me mp be bp --tasks sud --additional-tasks spmrl --additional-train data/spmrl/german/train.German.gold.conll --additional-dev data/spmrl/german/dev.German.gold.conll --additional-test data/spmrl/german/test.German.gold.conll --embed-extension spmrlgsd >> jobs/misc/spmrl.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged  --losses alternating  --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs me mp be bp --tasks ud --additional-tasks spmrl --additional-train data/spmrl/hungarian/train.Hungarian.gold.conll --additional-dev data/spmrl/hungarian/dev.Hungarian.gold.conll --additional-test data/spmrl/hungarian/test.Hungarian.gold.conll --embed-extension spmrlpadt >> jobs/misc/spmrl.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged  --losses alternating  --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs me mp be bp --tasks sud --additional-tasks spmrl --additional-train data/spmrl/hungarian/train.Hungarian.gold.conll --additional-dev data/spmrl/hungarian/dev.Hungarian.gold.conll --additional-test data/spmrl/hungarian/test.Hungarian.gold.conll --embed-extension spmrlpadt >> jobs/misc/spmrl.jobs
+
+# Train jobs for no features
+python scripts/job_builder.py -ln arabic -lc ar -t padt --features none --seeds 10 --use-fasttext both --jobs mt bt  > jobs/misc/none.jobs
+python scripts/job_builder.py -ln chinese -lc zh -t gsd --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln english -lc en -t ewt --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln greek -lc el -t gdt --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln korean -lc ko -t gsd --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln russian -lc ru -t gsd --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln turkish -lc tr -t imst --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln vietnamese -lc vi -t vtb --features none --seeds 10 --use-fasttext both --jobs mt bt  >> jobs/misc/none.jobs
+# Eval.Pred jobs for no features
+python scripts/job_builder.py -ln arabic -lc ar -t padt --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln chinese -lc zh -t gsd --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln english -lc en -t ewt --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln greek -lc el -t gdt --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln korean -lc ko -t gsd --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln russian -lc ru -t gsd --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln turkish -lc tr -t imst --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+python scripts/job_builder.py -ln vietnamese -lc vi -t vtb --features none --seeds 10 --use-fasttext both --jobs me mp be bp  >> jobs/misc/none.jobs
+
+
+# French-Finnish Train jobs for german and hungarian
+python scripts/job_builder.py -ln french  -lc fr -t gsd  --features none char tag tag-char --seeds 10 --use-fasttext both --jobs mt bt >  jobs/misc/fr-fi.jobs
+python scripts/job_builder.py -ln finnish -lc fi -t tdt  --features none char tag tag-char --seeds 10 --use-fasttext both --jobs mt bt >> jobs/misc/fr-fi.jobs
+# French-Finnish Evaluate/Predict jobs for german and hungarian
+python scripts/job_builder.py -ln french  -lc fr -t gsd  --features none char tag tag-char --seeds 10 --use-fasttext both --jobs me be mp bp >> jobs/misc/fr-fi.jobs
+python scripts/job_builder.py -ln finnish -lc fi -t tdt  --features none char tag tag-char --seeds 10 --use-fasttext both --jobs me be mp bp >> jobs/misc/fr-fi.jobs
+
+# Predict jobs for all languages
+python scripts/job_builder.py -ln arabic -lc ar -t padt     --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp > jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln chinese -lc zh -t gsd     --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln english -lc en -t ewt     --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd      --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln greek -lc el -t gdt       --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln korean -lc ko -t gsd      --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln russian -lc ru -t gsd     --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln turkish -lc tr -t imst    --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln vietnamese -lc vi -t vtb  --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln french -lc fr -t gsd      --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+python scripts/job_builder.py -ln finnish -lc fi -t tdt     --features none tag char tag-char --seeds 10 --use-fasttext both --jobs mp bp >> jobs/misc/all_pred.jobs
+
+python -m supar.cmds.multi_parser predict -d 0 -c config.ini --tree -p exp/chinese/ud-sud/gsd-tag-ft/joint-sharemlp/10 --task ud --data data/ud/ud-treebanks-v2.6/UD_Chinese-GSD/zh_gsd-ud-dev.conllu data/ud/ud-treebanks-v2.6/UD_Chinese-GSD/zh_gsd-ud-test.conllu --task sud --data data/sud/sud-treebanks-v2.6/SUD_Chinese-GSD/zh_gsd-sud-dev.conllu data/sud/sud-treebanks-v2.6/SUD_Chinese-GSD/zh_gsd-sud-test.conllu
+
+
+python -m supar.cmds.multi_parser predict -d 0 -c config.ini --tree -p exp/french/ud-sud/gsd-none/joint-sharemlp/10 --task ud --data data/ud/ud-treebanks-v2.6/UD_French-GSD/fr_gsd-ud-dev.conllu data/ud/ud-treebanks-v2.6/UD_French-GSD/fr_gsd-ud-test.conllu --task sud --data data/sud/sud-treebanks-v2.6/SUD_French-GSD/fr_gsd-sud-dev.conllu data/sud/sud-treebanks-v2.6/SUD_French-GSD/fr_gsd-sud-test.conllu 
+
+# SPMRL Jobs for arabic
+python scripts/job_builder.py -ln arabic -lc ar -t padt       --losses alternating --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs mt bt --tasks ud --additional-tasks spmrl --additional-train data/spmrl/arabic/train.arabic.gold.conll_6075 --additional-dev data/spmrl/arabic/dev.arabic.gold.conll_909 --additional-test data/spmrl/arabic/test.arabic.gold.conll --embed-extension spmrlpadt > jobs/misc/arabic-spmrl.jobs
+python scripts/job_builder.py -ln arabic -lc ar -t padt       --losses alternating --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs mt bt --tasks sud --additional-tasks spmrl --additional-train data/spmrl/arabic/train.arabic.gold.conll_6075 --additional-dev data/spmrl/arabic/dev.arabic.gold.conll_909 --additional-test data/spmrl/arabic/test.arabic.gold.conll --embed-extension spmrlpadt >> jobs/misc/arabic-spmrl.jobs
+python scripts/job_builder.py -ln arabic -lc ar -t padt       --losses alternating --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs me mp be bp --tasks ud --additional-tasks spmrl --additional-train data/spmrl/arabic/train.arabic.gold.conll_6075 --additional-dev data/spmrl/arabic/dev.arabic.gold.conll_909 --additional-test data/spmrl/arabic/test.arabic.gold.conll --embed-extension spmrlpadt >> jobs/misc/arabic-spmrl.jobs
+python scripts/job_builder.py -ln arabic -lc ar -t padt       --losses alternating --features none char tag tag-char tag-char-bert --seeds 10 --use-fasttext both --jobs me mp be bp --tasks sud --additional-tasks spmrl --additional-train data/spmrl/arabic/train.arabic.gold.conll_6075 --additional-dev data/spmrl/arabic/dev.arabic.gold.conll_909 --additional-test data/spmrl/arabic/test.arabic.gold.conll --embed-extension spmrlpadt >> jobs/misc/arabic-spmrl.jobs
+
+# Generate Results
+python -m scripts.conll_gather -l korean --tasks ud sud --treebank gsd          -et tag tag-ft char char-ft tag-char tag-char-ft -d -f standard > results/korean-ft.results
+python -m scripts.conll_gather -l vietnamese --tasks ud sud --treebank vtb      -et tag tag-ft char char-ft tag-char tag-char-ft -d -f standard > results/vietnamese-ft.results
+python -m scripts.conll_gather -l hungarian --tasks ud sud --treebank szeged    -et tag tag-ft char char-ft tag-char tag-char-ft -d -f standard > results/hungarian-ft.results
+python -m scripts.conll_gather -l russian --tasks ud sud --treebank gsd         -et tag tag-ft char char-ft tag-char tag-char-ft -d -f standard > results/russian-ft.results
+python -m scripts.conll_gather -l turkish --tasks ud sud --treebank imst        -et tag tag-ft char char-ft tag-char tag-char-ft -d -f standard > results/turkish-ft.results
+
+python -m scripts.conll_gather -l french --tasks ud sud --treebank gsd          -et none none-ft tag tag-ft char char-ft tag-char tag-char-ft -d > results/french2.results
+python -m scripts.conll_gather -l finnish --tasks ud sud --treebank tdt         -et none none-ft tag tag-ft char char-ft tag-char tag-char-ft -d > results/finnish2.results
+python -m scripts.conll_gather -l greek --tasks ud sud --treebank gdt           -et none none-ft tag tag-ft char char-ft tag-char tag-char-ft -d > results/greek2.results
+python -m scripts.conll_gather -l german --tasks ud sud --treebank gsd          -et none none-ft tag tag-ft char char-ft tag-char tag-char-ft -d > results/german2.results
+python -m scripts.conll_gather -l english --tasks ud sud --treebank ewt         -et none none-ft tag tag-ft char char-ft tag-char tag-char-ft -d > results/english2.results
+
+
+# Finetune Jobs for None
+python scripts/job_builder.py -ln korean -lc ko -t gsd          --features char tag tag-char --seeds 10 --use-fasttext both --jobs mp >  jobs/misc/kovihurutr-ft-pred.jobs
+python scripts/job_builder.py -ln vietnamese -lc vi -t vtb      --features char tag tag-char --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/kovihurutr-ft-pred.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged    --features char tag tag-char --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/kovihurutr-ft-pred.jobs
+python scripts/job_builder.py -ln russian -lc ru -t gsd         --features char tag tag-char --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/kovihurutr-ft-pred.jobs
+python scripts/job_builder.py -ln turkish -lc tr -t imst        --features char tag tag-char --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/kovihurutr-ft-pred.jobs
+
+python scripts/job_builder.py -ln arabic -lc ar -t padt         --features char tag tag-char --seeds 10 --use-fasttext both --jobs mt >  jobs/misc/remaining-ft.jobs
+python scripts/job_builder.py -ln chinese -lc zh -t gsd         --features char tag tag-char --seeds 10 --use-fasttext both --jobs mt >> jobs/misc/remaining-ft.jobs
+python scripts/job_builder.py -ln english -lc en -t ewt         --features char tag tag-char --seeds 10 --use-fasttext both --jobs mt >> jobs/misc/remaining-ft.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd          --features char tag tag-char --seeds 10 --use-fasttext both --jobs mt >> jobs/misc/remaining-ft.jobs
+python scripts/job_builder.py -ln greek -lc el -t gdt           --features char tag tag-char --seeds 10 --use-fasttext both --jobs mt >> jobs/misc/remaining-ft.jobs
+python scripts/job_builder.py -ln french -lc fr -t gsd          --features char tag tag-char --seeds 10 --use-fasttext both --jobs mt >> jobs/misc/remaining-ft.jobs
+python scripts/job_builder.py -ln finnish -lc fi -t tdt         --features char tag tag-char --seeds 10 --use-fasttext both --jobs mt >> jobs/misc/remaining-ft.jobs
+
+# Finetune Pred Jobs for None
+python scripts/job_builder.py -ln korean -lc ko -t gsd          --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln vietnamese -lc vi -t vtb      --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln hungarian -lc hu -t szeged    --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln russian -lc ru -t gsd         --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln turkish -lc tr -t imst        --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln arabic -lc ar -t padt         --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln chinese -lc zh -t gsd         --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln english -lc en -t ewt         --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln german -lc de -t gsd          --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln greek -lc el -t gdt           --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln french -lc fr -t gsd          --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+python scripts/job_builder.py -ln finnish -lc fi -t tdt         --features none --seeds 10 --use-fasttext both --jobs mp >> jobs/misc/none-ft.jobs
+
