@@ -2,7 +2,6 @@
 
 from collections import Counter
 import torch
-from numba import jit
 
 class Metric(object):
 
