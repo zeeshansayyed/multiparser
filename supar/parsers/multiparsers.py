@@ -180,6 +180,7 @@ class MultiTaskParser(Parser):
                 for task_id, finetune_task in enumerate(args.task_names):
                     logger.info(f"Finetuning model: {start_task}.model with {finetune_task} data")
                     args.path = args.exp_dir / f"{start_task}.model"
+                    args.loss_weights = self.args.loss_weights
                     parser = self.load(**args)
                     if args.finetune == 'partial':
                         parser.model.freeze_shared()
@@ -251,7 +252,8 @@ class MultiTaskParser(Parser):
             transform.eval()
             if args.prob:
                 transform.append(Field('probs'))
-
+        
+        original_path = args.path
         for task, data_list in zip(args.task, args.data):
             # args.task_names was saved in parser while training
             # args.task was provided as cmd line args while evaluation
@@ -287,7 +289,7 @@ class MultiTaskParser(Parser):
                         logger.info(f"Saving predicted results to {pred}")
                         transform.save(pred, dataset.sentences)
                     logger.info(f"{elapsed}s elapsed, {len(dataset) / elapsed.total_seconds():.2f} Sents/s")
-
+            args.path = original_path
         return dataset
 
     @classmethod
