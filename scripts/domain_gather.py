@@ -147,17 +147,17 @@ def gather(lang, tasks, treebanks, embed_extension, exp_types, losses, mlps, see
     print_results(baseline_results, multitask_results, debug=debug)
 
 
-# tasks = ['gsd', 'tw']
-# treebanks = ['gsd', 'tweeDe']
-# lang = 'german'
+tasks = ['gsd', 'tw']
+treebanks = ['gsd', 'tweeDe']
+lang = 'german'
 
 # tasks = ['isdt', 'po']
 # treebanks = ['isdt', 'postwita']
 # lang = 'italian'
 
-tasks = ['isdt', 'tw']
-treebanks = ['isdt', 'twittiro']
-lang = 'italian'
+# tasks = ['isdt', 'tw']
+# treebanks = ['isdt', 'twittiro']
+# lang = 'italian'
 
 # tasks = ['po', 'tw']
 # treebanks = ['postwita', 'twittiro']
@@ -170,10 +170,11 @@ regular_results = []
 partial_results = []
 whole_results = []
 mtl_setting = 'sharemlp'
-exp_sizes = ['full']
-# exp_sizes = ['4k']
+# exp_sizes = ['full']
+exp_sizes = ['1k', '2k', '4k', 'full']
 ratios = [f"{0.05+i*0.05:.2f}-{1-(0.05+i*0.05):.2f}" for i in range(19)]
-ratios = ['0.20-0.80']
+# ratios = ['0.85-0.15']
+ratios = [f"{0.1+i*0.1:.1f}-{2-(0.1+i*0.1):.1f}" for i in range(19)]
 for exp_size in exp_sizes:
     results = defaultdict(lambda: defaultdict(list))
     for task, treebank in zip(tasks, treebanks):
@@ -182,8 +183,10 @@ for exp_size in exp_sizes:
         else:
             split = og_split
         for ratio in ratios:
-            exp_dir = exp_root / 'domain' / lang / f"{'-'.join(tasks)}" / 'tag' / exp_size / f'sharemlp-{ratio}'
-            # exp_dir = exp_root / 'domain' / lang / f"{'-'.join(tasks)}" / feature / exp_size / mtl_setting / ratio
+            # exp_dir = exp_root / 'domain' / lang / 'gsd-tw' / 'tag' / exp_size / f'sharemlp-{ratio}' # Only for old german
+            exp_dir = exp_root / 'domain' / 'gsd-tweeDe' / 'tag' / exp_size / f'sharemlp-{ratio}' # Weird German 1-1
+            # exp_dir = exp_root / 'domain' / lang / f"{'-'.join(tasks)}" / 'tag' / exp_size / f'sharemlp-{ratio}' # Regular
+            # exp_dir = exp_root / 'domain' / lang / f"{'-'.join(tasks)}" / feature / exp_size / mtl_setting / ratio # New
             if treebank == 'tweeDe':
                 regular_conll_name = f"{task}-{treebank}_{split}.conllu"
             else:
@@ -191,7 +194,7 @@ for exp_size in exp_sizes:
 
             regular_res, partial_res, whole_res = [], [], []
 
-            for seed in ['10', '30', '40']:
+            for seed in ['10', '20', '30']:
                 curr_exp_dir = exp_dir / seed
                 regular_conll_file = curr_exp_dir / regular_conll_name
                 partial_conll_file = curr_exp_dir / f"partial-{task}-{regular_conll_name}"
@@ -219,7 +222,7 @@ for exp_size in exp_sizes:
             data[f'{task}-{finetune}'] = np.array(results[finetune][task]).mean(axis=1)
 
     # data.to_csv(f"results/domain/{lang_codes[lang]}_{exp_size}_{'-'.join(tasks)}_{split}.csv")
-    # data.to_csv(f"results/domain/{lang_codes[lang]}_{exp_size}_{'-'.join(tasks)}_{mtl_setting}_{split}.csv")
+    data.to_csv(f"results/domain_weights/0_2/{lang_codes[lang]}_{exp_size}_{'-'.join(tasks)}_{mtl_setting}_{split}.csv")
 
 
 
