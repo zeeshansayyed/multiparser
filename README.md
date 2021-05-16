@@ -26,21 +26,21 @@ The default behavior of the parser is to train without sharing the MLP layers be
 
     python -m supar.cmds.multi_parser train -b -d 0 -c config.ini -p path/to/experiment/directory --train path/to/treebank1/trainfile path/to/treebank2/trainfile --dev path/to/treebank1/devfile path/to/treebank2/devfile --test path/to/treebank1/testfile path/to/treebank2/testfile --task-names task1name task2name --share-mlp
 
-#### Trainig with a joint loss
+#### Training with a joint loss
 
 The default behavior of the parser is to train using alternating batch loss. There is the possibility of training with the parser with a join loss using --joint-loss.
 
     python -m supar.cmds.multi_parser train -b -d 0 -c config.ini -p path/to/experiment/directory --train path/to/treebank1/trainfile path/to/treebank2/trainfile --dev path/to/treebank1/devfile path/to/treebank2/devfile --test path/to/treebank1/testfile path/to/treebank2/testfile --task-names task1name task2name --joint-loss
 
-Note: To use a joint loss, the treebanks must be parallel treebanks (e.g. UD and SUD version of a treebank).
+Note: to use a joint loss, the treebanks must be parallel treebanks (e.g. UD and SUD version of a treebank).
 
 #### Training with loss weights
 
-To assign specific loss weights to an individual task, use the --loss-weights argument and then specicfy the weight for each tasks in the order that the tasks are provided:
+To assign specific loss weights to an individual task, use the --loss-weights argument and then specicfy the weight for each task in the order that the tasks are provided:
 
     python -m supar.cmds.multi_parser train -b -d 0 -c config.ini -p path/to/experiment/directory --train path/to/treebank1/trainfile path/to/treebank2/trainfile --dev path/to/treebank1/devfile path/to/treebank2/devfile --test path/to/treebank1/testfile path/to/treebank2/testfile --task-names task1name task2name --loss-weights 0.95 0.05
 
-Note: that the default behavior is to assign 1.0 to all tasks and is currently availble only for alternating batch losss.
+Note: the default behavior is to assign 1.0 to all tasks and is currently availble only for alternating batch losss.
 
 ## Cite
 
