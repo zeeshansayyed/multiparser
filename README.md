@@ -44,13 +44,24 @@ Note: the default behavior is to assign 1.0 to all tasks and is currently availb
 
 ## Cite
 
-If you use the multi-task parser, pease cite:
+If you use the base multi-task parser, please cite:
 
 ```
 @InProceedings{alisayyed:dakota:2021,
   Title                    = {Annotations Matter: Leveraging Multitask Learning to Parse UD and SUD},
   Author                   = {Ali Sayyed, Zeeshan and Dakota, Daniel},
   Booktitle                = {Findings of the Association for Computational Linguistics: ACL 2021},
+  Year                     = {2021}
+}
+```
+
+If you use the weighted multi-task parser, please additionally cite:
+
+```
+@InProceedings{dakota:alisayyed:kuebler:2021,
+  Title                    = {Bidirectional Domain Adaptation Using Weighted Multi-Task Learning},
+  Author                   = {Dakota, Daniel and Ali Sayyed, Zeeshan and K\"ubler, Sandra},
+  Booktitle                = {Proceedings of the 17th International Conference on Parsing Technologies},
   Year                     = {2021}
 }
 ```
