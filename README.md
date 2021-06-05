@@ -50,7 +50,7 @@ If you use the base multi-task parser, please cite:
 @InProceedings{alisayyed:dakota:2021,
   Title                    = {Annotations Matter: Leveraging Multitask Learning to Parse UD and SUD},
   Author                   = {Ali Sayyed, Zeeshan and Dakota, Daniel},
-  Booktitle                = {Findings of the Association for Computational Linguistics: ACL 2021},
+  Booktitle                = {Findings of the Association for Computational Linguistics: ACL-IJCNLP 2021},
   Year                     = {2021}
 }
 ```
